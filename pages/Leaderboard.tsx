@@ -3,6 +3,7 @@ import PageTransition from '../components/PageTransition';
 import { LeaderboardEntry } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const LeaderboardPage: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -79,7 +80,44 @@ const LeaderboardPage: React.FC = () => {
             <div className="w-full max-w-4xl mx-auto backdrop-blur-sm bg-black/30 p-4 sm:p-8 rounded-2xl border-2 border-[#ff7b00]/50">
                 <h1 className="text-4xl md:text-5xl font-orbitron font-bold mb-8 text-glow text-center">Leaderboard</h1>
                 {loading ? (
-                    <div className="text-center py-8 text-lg font-rajdhani animate-pulse">Scanning frequencies for leaderboard data...</div>
+                    <div className="space-y-2">
+                        {/* Desktop Skeleton */}
+                        <div className="hidden md:block">
+                             <div className="grid grid-cols-12 gap-4 p-4 border-b-2 border-[#ff7b00]/30">
+                                <SkeletonLoader className="col-span-2 h-6" />
+                                <SkeletonLoader className="col-span-4 h-6" />
+                                <SkeletonLoader className="col-span-3 h-6" />
+                                <SkeletonLoader className="col-span-3 h-6" />
+                            </div>
+                             <div className="mt-2 space-y-2">
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} className="grid grid-cols-12 gap-4 items-center p-2 rounded-lg bg-white/5">
+                                        <SkeletonLoader className="col-span-2 h-8" />
+                                        <SkeletonLoader className="col-span-4 h-8" />
+                                        <SkeletonLoader className="col-span-3 h-8" />
+                                        <SkeletonLoader className="col-span-3 h-8" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                         {/* Mobile Skeleton */}
+                        <div className="md:hidden space-y-4">
+                             {[...Array(5)].map((_, i) => (
+                                <div key={i} className="p-4 rounded-lg bg-white/5">
+                                    <div className="flex justify-between items-center">
+                                        <div className="w-2/3 space-y-2">
+                                            <SkeletonLoader className="h-6 w-full" />
+                                            <SkeletonLoader className="h-4 w-1/3" />
+                                        </div>
+                                        <div className="w-1/4 space-y-2">
+                                            <SkeletonLoader className="h-5 w-full" />
+                                            <SkeletonLoader className="h-5 w-full" />
+                                        </div>
+                                    </div>
+                                </div>
+                             ))}
+                        </div>
+                    </div>
                 ) : (
                     <div>
                         {/* Mobile Card View */}

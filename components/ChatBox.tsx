@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Message } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import SkeletonLoader from './SkeletonLoader';
 
 interface ChatBoxProps {
     senderName: string;
@@ -52,8 +53,26 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
             <h3 className="text-xl font-orbitron p-4 border-b border-white/20 text-center text-glow-blue">Event Chat</h3>
             <div className="flex-1 p-4 space-y-4 overflow-y-auto">
                 {loading ? (
-                    <div className="flex h-full items-center justify-center">
-                        <p className="text-gray-400 animate-pulse">Loading messages...</p>
+                    <div className="space-y-4">
+                        <div className="flex justify-start">
+                            <div className="space-y-2 p-3 rounded-lg bg-white/5 w-3/5">
+                                <SkeletonLoader className="h-4 w-1/3" />
+                                <SkeletonLoader className="h-4 w-full" />
+                                <SkeletonLoader className="h-4 w-2/3" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <div className="space-y-2 p-3 rounded-lg bg-[#ff7b00]/10 w-1/2">
+                                <SkeletonLoader className="h-4 w-full" />
+                                <SkeletonLoader className="h-4 w-3/4" />
+                            </div>
+                        </div>
+                        <div className="flex justify-start">
+                            <div className="space-y-2 p-3 rounded-lg bg-white/5 w-2/3">
+                                <SkeletonLoader className="h-4 w-1/4" />
+                                <SkeletonLoader className="h-4 w-full" />
+                            </div>
+                        </div>
                     </div>
                 ) : (
                     <>

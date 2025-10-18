@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import FullScreenLoader from './FullScreenLoader';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminRequired
   const location = useLocation();
 
   if (loading) {
-    return <div className="text-2xl font-orbitron text-glow-blue animate-pulse">Verifying Access...</div>; // Or a spinner component
+    return <FullScreenLoader text="Verifying Access..." />;
   }
 
   if (!user) {

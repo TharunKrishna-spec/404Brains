@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { v4 as uuidv4 } from 'uuid'; // For unique file names
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmationModal from '../components/ConfirmationModal';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const DOMAINS = ['Cybernetics', 'Quantum', 'Bio-Synth', 'Neutrino'];
 
@@ -25,6 +26,22 @@ const formatTime = (seconds: number): string => {
 };
 
 type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard';
+
+const AdminContentSkeleton: React.FC = () => (
+    <div className="w-full">
+        <SkeletonLoader className="h-10 w-1/2 mb-8" />
+        <div className="space-y-4">
+            {[...Array(4)].map((_, i) => (
+                 <div key={i} className="p-4 bg-white/5 rounded-lg flex items-center gap-4">
+                    <div className="flex-1 space-y-2">
+                        <SkeletonLoader className={`h-6 ${i % 2 === 0 ? 'w-3/4' : 'w-2/3'}`} />
+                        <SkeletonLoader className={`h-4 ${i % 2 === 0 ? 'w-1/2' : 'w-1/3'}`} />
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
 
 const AdminDashboardPage: React.FC = () => {
     const { logout } = useAuth();
@@ -99,7 +116,7 @@ const AdminDashboardPage: React.FC = () => {
                         <main className="flex-1 flex flex-col min-h-[60vh] md:min-h-0 bg-black/30 p-6 rounded-lg border border-white/20">
                             {isLoading ? (
                                 <div className="flex-1 flex items-center justify-center">
-                                    <p className="text-2xl font-orbitron text-glow-blue animate-pulse">Loading Data...</p>
+                                    <AdminContentSkeleton />
                                 </div>
                             ) : (
                                 renderContent()

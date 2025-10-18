@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
@@ -11,6 +12,7 @@ import LeaderboardPage from './pages/Leaderboard';
 import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
+import FullScreenLoader from './components/FullScreenLoader';
 
 const AnimatedRoutes: React.FC = () => {
     const location = useLocation();
@@ -54,20 +56,17 @@ const AnimatedRoutes: React.FC = () => {
 const App: React.FC = () => {
   const { loading } = useAuth();
 
-  // Show a loading screen while Supabase session is being fetched.
-  if (loading) {
-    return (
-       <Layout>
-          <div className="text-2xl font-orbitron text-glow-blue animate-pulse">Initializing Session...</div>
-       </Layout>
-    )
-  }
-
+  // FIX: Centralize Layout and use a ternary for conditional rendering.
+  // This ensures a consistent component structure and fixes the type error.
   return (
     <Layout>
-      <HashRouter>
-        <AnimatedRoutes />
-      </HashRouter>
+      {loading ? (
+        <FullScreenLoader text="Initializing Session..." />
+      ) : (
+        <HashRouter>
+          <AnimatedRoutes />
+        </HashRouter>
+      )}
     </Layout>
   );
 };

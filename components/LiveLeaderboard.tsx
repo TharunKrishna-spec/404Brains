@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { LeaderboardEntry } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
+import SkeletonLoader from './SkeletonLoader';
+
+const LeaderboardRowSkeleton: React.FC = () => (
+    <div className="p-3 rounded-md flex items-center justify-between bg-white/5">
+        <div className="flex items-center gap-4">
+            <SkeletonLoader className="w-8 h-7" />
+            <SkeletonLoader className="w-32 h-6" />
+        </div>
+        <div className="text-right">
+            <SkeletonLoader className="w-20 h-6" />
+        </div>
+    </div>
+);
 
 const LiveLeaderboard: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -75,7 +88,9 @@ const LiveLeaderboard: React.FC = () => {
             <h2 className="text-2xl font-orbitron text-center p-4 text-glow border-b-2 border-[#ff7b00]/50">Live Standings</h2>
             <div className="flex-1 overflow-y-auto p-4">
                 {loading ? (
-                    <div className="text-center text-gray-400 animate-pulse">Loading standings...</div>
+                    <div className="space-y-3">
+                        {[...Array(8)].map((_, i) => <LeaderboardRowSkeleton key={i} />)}
+                    </div>
                 ) : (
                     <div className="space-y-3">
                     <AnimatePresence>

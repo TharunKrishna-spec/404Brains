@@ -4,12 +4,11 @@ import GlowingButton from '../components/GlowingButton';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabaseClient';
 import { Team, Clue, TeamProgress } from '../types';
-import ChatBox from '../components/ChatBox';
 import LiveLeaderboard from '../components/LiveLeaderboard';
 import { motion, AnimatePresence } from 'framer-motion';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const CheckIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
-const CoinsIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01M12 18v-1m0-1v-.01m0-2.01V12m0 6v1m0 1v1m0-2.01M6 12H5m1 0h.01M4 12H3m2.01 0H6m12 0h-1m-1 0h-.01m-2.01 0H18m-6-6v.01M12 4V3m0-1V2m0 2.01M18 6l.01.01M6 6l-.01.01M18 18l.01.01M6 18l-.01.01" /></svg>;
 
 const formatTime = (seconds: number): string => {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -17,6 +16,63 @@ const formatTime = (seconds: number): string => {
     const s = (seconds % 60).toString().padStart(2, '0');
     return `${h}:${m}:${s}`;
 };
+
+const ClueCardSkeleton: React.FC = () => (
+    <div className="p-4 rounded-lg bg-black/40 border-2 border-white/20">
+        <div className="flex justify-between items-start">
+            <SkeletonLoader className="h-7 w-1/4" />
+        </div>
+        <SkeletonLoader className="h-5 w-full mt-3" />
+        <SkeletonLoader className="h-5 w-3/4 mt-2" />
+        <div className="mt-4 flex gap-2">
+            <SkeletonLoader className="flex-1 h-10 rounded-md" />
+            <SkeletonLoader className="w-32 h-12 rounded-md" />
+        </div>
+    </div>
+);
+
+const TeamDashboardSkeleton: React.FC = () => (
+    <PageTransition>
+        <div className="w-full max-w-7xl mx-auto backdrop-blur-sm bg-black/30 p-4 sm:p-8 rounded-2xl border-2 border-[#ff7b00]/50">
+            <div className="text-center mb-8">
+                <SkeletonLoader className="h-12 w-1/2 mx-auto" />
+                <SkeletonLoader className="h-6 w-1/3 mx-auto mt-4" />
+            </div>
+            <div className="mb-8 p-4 bg-black/40 rounded-lg border border-dashed border-white/20">
+                <SkeletonLoader className="h-6 w-1/4 mx-auto mb-2" />
+                <SkeletonLoader className="h-16 w-1/2 mx-auto" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                    <SkeletonLoader className="h-10 w-1/3" />
+                    <div className="space-y-4">
+                        <ClueCardSkeleton />
+                        <ClueCardSkeleton />
+                    </div>
+                </div>
+                <div className="lg:col-span-1 h-[60vh]">
+                     <div className="h-full bg-black/50 border-2 border-[#ff7b00]/50 rounded-lg shadow-lg shadow-[#ff7b00]/10 flex flex-col">
+                        <h2 className="text-2xl font-orbitron text-center p-4 text-glow border-b-2 border-[#ff7b00]/50">Live Standings</h2>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                             {[...Array(5)].map((_, i) => (
+                                <div key={i} className="p-3 rounded-md flex items-center justify-between bg-white/5">
+                                    <div className="flex items-center gap-4">
+                                        <SkeletonLoader className="w-8 h-7" />
+                                        <SkeletonLoader className="w-32 h-6" />
+                                    </div>
+                                    <div className="text-right">
+                                        <SkeletonLoader className="w-20 h-6" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </PageTransition>
+);
+
 
 const TeamDashboardPage: React.FC = () => {
     const { user, logout } = useAuth();
@@ -29,6 +85,7 @@ const TeamDashboardPage: React.FC = () => {
     const [elapsedTime, setElapsedTime] = useState(0);
     const [currentAnswer, setCurrentAnswer] = useState<{ [clueId: number]: string }>({});
     const [submitStatus, setSubmitStatus] = useState<{ [clueId: number]: 'idle' | 'loading' | 'correct' | 'incorrect' }>({});
+    const [awardedCoins, setAwardedCoins] = useState<{ [clueId: number]: number }>({});
     
     useEffect(() => {
         const fetchTeamData = async () => {
@@ -126,8 +183,17 @@ const TeamDashboardPage: React.FC = () => {
 
         if (clue.answer === submittedAnswer) {
              setSubmitStatus(prev => ({ ...prev, [clueId]: 'correct' }));
+             
+             let coinsToAdd = 10;
+             if (elapsedTime <= 5 * 60) { // 5 minutes
+                coinsToAdd = 30;
+             } else if (elapsedTime <= 10 * 60) { // 10 minutes
+                coinsToAdd = 20;
+             }
+             setAwardedCoins(prev => ({ ...prev, [clueId]: coinsToAdd }));
+
              await supabase.from('team_progress').insert({ team_id: team.id, clue_id: clueId });
-             const newCoins = (team.coins || 0) + 10;
+             const newCoins = (team.coins || 0) + coinsToAdd;
              await supabase.from('teams').update({ coins: newCoins }).eq('id', team.id);
         } else {
             setSubmitStatus(prev => ({ ...prev, [clueId]: 'incorrect' }));
@@ -137,10 +203,8 @@ const TeamDashboardPage: React.FC = () => {
         }
     };
 
-    const solvedCount = progress.length;
-
     if (loading) {
-        return <div className="text-2xl font-orbitron text-glow-blue animate-pulse">Loading Team Data...</div>;
+        return <TeamDashboardSkeleton />;
     }
     
     if (!team) {
@@ -168,16 +232,6 @@ const TeamDashboardPage: React.FC = () => {
                     <div className="text-center mb-8">
                         <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-glow">{team.name}</h1>
                         <p className="text-xl font-rajdhani text-gray-300 mt-2">Domain: <span className="font-bold text-[#ff7b00]">{team.domain}</span></p>
-                        <div className="mt-4 flex justify-center items-center gap-4 text-2xl font-orbitron">
-                            <div className="flex items-center gap-2 p-2 bg-black/30 border border-white/20 rounded-lg">
-                                <CoinsIcon className="w-8 h-8 text-yellow-400" />
-                                <span className="text-yellow-400">{team.coins}</span>
-                            </div>
-                             <div className="flex items-center gap-2 p-2 bg-black/30 border border-white/20 rounded-lg">
-                                <CheckIcon className="w-8 h-8 text-green-400" />
-                                <span className="text-green-400">{solvedCount} / {clues.length}</span>
-                            </div>
-                        </div>
                     </div>
                     
                     {eventStatus === 'stopped' && (
@@ -254,7 +308,7 @@ const TeamDashboardPage: React.FC = () => {
                                                         {status === 'correct' && (
                                                             <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="mt-4 text-center font-orbitron text-2xl text-green-400 text-glow-green flex items-center justify-center gap-2">
                                                                 <CheckIcon className="w-8 h-8"/>
-                                                                <span>CORRECT! +10 COINS</span>
+                                                                <span>CORRECT! +{awardedCoins[clue.id] || 10} COINS</span>
                                                             </motion.div>
                                                         )}
                                                     </AnimatePresence>
@@ -266,13 +320,8 @@ const TeamDashboardPage: React.FC = () => {
                                     <p className="text-gray-400 italic">No clues have been assigned to your domain yet.</p>
                                 )}
                             </div>
-                            <div className="lg:col-span-1 flex flex-col gap-6" style={{maxHeight: '75vh'}}>
-                                <div className="flex-1 min-h-0">
-                                    <LiveLeaderboard />
-                                </div>
-                                <div className="flex-1 min-h-0">
-                                    <ChatBox senderName={team.name} />
-                                </div>
+                            <div className="lg:col-span-1">
+                                <LiveLeaderboard />
                             </div>
                         </motion.div>
                     )}
