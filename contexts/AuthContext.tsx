@@ -14,7 +14,17 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+// FIX: Refactored AuthProvider to use an explicit props interface and React.FC for clarity and robustness.
+// This can help resolve complex type inference issues where the 'children' prop might not be correctly recognized.
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+    // --- IMPORTANT: CONFIGURE YOUR ADMIN EMAIL HERE ---
+    // Only the email address listed here will be allowed to log in as an admin.
+    const ADMIN_EMAIL = 'troon12083@gmail.com'; // Replace with your admin email
+
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -28,7 +38,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             if (session?.user) {
                 const userRole = localStorage.getItem('userRole');
-                setIsAdmin(userRole === 'admin');
+                // Check that the role is 'admin' AND the email matches the authorized admin email.
+                setIsAdmin(userRole === 'admin' && session.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase());
             } else {
                 localStorage.removeItem('userRole');
                 setIsAdmin(false);
@@ -43,9 +54,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(session?.user ?? null);
 
                 if (event === 'SIGNED_IN') {
-                    // Re-check role from localStorage to ensure context is up-to-date
+                    // Re-check role from localStorage and email to ensure context is up-to-date
                     const userRole = localStorage.getItem('userRole');
-                    setIsAdmin(userRole === 'admin');
+                    setIsAdmin(userRole === 'admin' && session?.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase());
                 } else if (event === 'SIGNED_OUT') {
                     localStorage.removeItem('userRole');
                     setIsAdmin(false);
@@ -56,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return () => {
             authListener.subscription.unsubscribe();
         };
-    }, []);
+    }, [ADMIN_EMAIL]);
 
     const login = async (email: string, password: string) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -71,6 +82,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const loginAsAdmin = async (email: string, password: string): Promise<boolean> => {
+        // Only allow the configured admin email to attempt an admin login
+        if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+            return false;
+        }
+
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (!error && data.session) {
             localStorage.setItem('userRole', 'admin');

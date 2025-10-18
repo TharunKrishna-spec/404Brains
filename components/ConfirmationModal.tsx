@@ -53,9 +53,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               <GlowingButton
                 onClick={onConfirm}
                 className="!py-2 !px-6 !border-red-500 group-hover:!bg-red-500"
-                disabled={isConfirming}
+                loading={isConfirming}
               >
-                {isConfirming ? 'Deleting...' : confirmText}
+                {confirmText}
               </GlowingButton>
             </div>
           </motion.div>

@@ -50,8 +50,8 @@ const TeamLoginPage: React.FC = () => {
               className="w-full px-4 py-3 bg-transparent border-2 border-[#ff7b00]/50 rounded-md focus:outline-none focus:border-[#ff7b00] focus:ring-1 focus:ring-[#ff7b00] placeholder-gray-500" />
           </div>
           {error && <p className="text-red-400 text-center text-sm">{error}</p>}
-          <GlowingButton type="submit" className="w-full" disabled={loading}>
-             {loading ? 'Logging In...' : 'Login'}
+          <GlowingButton type="submit" className="w-full" loading={loading}>
+             Login
           </GlowingButton>
            <div className="text-center mt-4">
              <Link to="/" className="text-sm text-gray-400 hover:text-[#ff7b00] hover:underline transition-colors">

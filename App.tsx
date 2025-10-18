@@ -1,7 +1,9 @@
 
 
+
 import React from 'react';
-import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+// FIX: Removed HashRouter from imports as it is now handled in index.tsx.
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import LandingPage from './pages/Landing';
 import AdminLoginPage from './pages/AdminLogin';
@@ -13,6 +15,7 @@ import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
 import FullScreenLoader from './components/FullScreenLoader';
+import { ToastProvider } from './components/Toast';
 
 const AnimatedRoutes: React.FC = () => {
     const location = useLocation();
@@ -59,15 +62,15 @@ const App: React.FC = () => {
   // FIX: Centralize Layout and use a ternary for conditional rendering.
   // This ensures a consistent component structure and fixes the type error.
   return (
-    <Layout>
-      {loading ? (
-        <FullScreenLoader text="Initializing Session..." />
-      ) : (
-        <HashRouter>
-          <AnimatedRoutes />
-        </HashRouter>
-      )}
-    </Layout>
+    <ToastProvider>
+        <Layout>
+        {loading ? (
+            <FullScreenLoader text="Initializing Session..." />
+        ) : (
+            <AnimatedRoutes />
+        )}
+        </Layout>
+    </ToastProvider>
   );
 };
 

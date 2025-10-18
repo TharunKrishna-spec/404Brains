@@ -16,12 +16,25 @@ const LeaderboardRowSkeleton: React.FC = () => (
     </div>
 );
 
+// A simple reload icon component
+const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 10M20 20l-1.5-1.5A9 9 0 013.5 14" />
+    </svg>
+);
+
+
 const LiveLeaderboard: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const fetchLeaderboard = async () => {
-        setLoading(true);
+        // Set loading to true only for the initial fetch
+        if (leaderboard.length === 0 && !isRefreshing) {
+            setLoading(true);
+        }
+        
         const { data: teams, error: teamsError } = await supabase.from('teams').select('*');
         if (teamsError) {
             console.error(teamsError);
@@ -52,14 +65,29 @@ const LiveLeaderboard: React.FC = () => {
         });
 
         boardData.sort((a, b) => {
+            // 1. Descending by clues solved
             if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
+            // 2. Descending by coins
             if (b.coins !== a.coins) return b.coins - a.coins;
-            if (a.lastSolveTime && b.lastSolveTime) return new Date(a.lastSolveTime).getTime() - new Date(b.lastSolveTime).getTime();
-            return 0;
+            // 3. Ascending by last solve time (earlier is better)
+            if (a.lastSolveTime && b.lastSolveTime) {
+                const timeA = new Date(a.lastSolveTime).getTime();
+                const timeB = new Date(b.lastSolveTime).getTime();
+                if(timeA !== timeB) return timeA - timeB;
+            }
+            // 4. Tie-breaker: Ascending by Team ID for consistency
+            return a.id - b.id;
         });
         
         setLeaderboard(boardData.map((item, index) => ({ ...item, rank: index + 1 })));
         setLoading(false);
+    };
+
+    const handleRefresh = async () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        await fetchLeaderboard();
+        setIsRefreshing(false);
     };
 
     useEffect(() => {
@@ -69,7 +97,12 @@ const LiveLeaderboard: React.FC = () => {
             .channel('public:live_leaderboard')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboard)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboard)
-            .subscribe();
+            // FIX: The subscribe method requires a callback to handle subscription status.
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log('Subscribed to live leaderboard updates.');
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);
@@ -85,7 +118,17 @@ const LiveLeaderboard: React.FC = () => {
 
     return (
         <div className="h-full bg-black/50 border-2 border-[#ff7b00]/50 rounded-lg shadow-lg shadow-[#ff7b00]/10 flex flex-col">
-            <h2 className="text-2xl font-orbitron text-center p-4 text-glow border-b-2 border-[#ff7b00]/50">Live Standings</h2>
+            <div className="flex justify-between items-center p-4 border-b-2 border-[#ff7b00]/50">
+                <h2 className="text-2xl font-orbitron text-center text-glow">Live Standings</h2>
+                <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="p-1 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                    aria-label="Refresh leaderboard"
+                >
+                    <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
             <div className="flex-1 overflow-y-auto p-4">
                 {loading ? (
                     <div className="space-y-3">

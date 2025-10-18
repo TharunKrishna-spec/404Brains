@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Message } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import SkeletonLoader from './SkeletonLoader';
+import Spinner from './Spinner';
 
 interface ChatBoxProps {
     senderName: string;
@@ -12,6 +13,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -27,7 +29,12 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
                 setMessages(currentMessages => [...currentMessages, payload.new as Message]);
             })
-            .subscribe();
+            // FIX: The subscribe method requires a callback to handle subscription status.
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log('Subscribed to messages channel.');
+                }
+            });
         
         return () => {
             supabase.removeChannel(channel);
@@ -40,11 +47,13 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newMessage.trim()) {
+        if (newMessage.trim() && !isSending) {
+            setIsSending(true);
             const { error } = await supabase.from('messages').insert({ sender: senderName, text: newMessage.trim() });
             if (!error) {
                 setNewMessage('');
             }
+            setIsSending(false);
         }
     };
 
@@ -112,10 +121,15 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
-                    className="flex-1 px-4 py-2 bg-transparent border-2 border-white/30 rounded-md focus:outline-none focus:border-[#ff7b00] focus:ring-1 focus:ring-[#ff7b00] placeholder-gray-500"
+                    className="flex-1 px-4 py-2 bg-transparent border-2 border-white/30 rounded-md focus:outline-none focus:border-[#ff7b00] focus:ring-1 focus:ring-[#ff7b00] placeholder-gray-500 disabled:opacity-50"
+                    disabled={isSending}
                 />
-                <button type="submit" className="px-6 py-2 bg-[#ff7b00] rounded-md font-bold hover:bg-[#ff7b00]/80 transition-colors">
-                    Send
+                <button 
+                    type="submit" 
+                    className="px-6 py-2 bg-[#ff7b00] rounded-md font-bold hover:bg-[#ff7b00]/80 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSending || !newMessage.trim()}
+                >
+                    {isSending ? <Spinner className="w-5 h-5" /> : 'Send'}
                 </button>
             </form>
         </div>

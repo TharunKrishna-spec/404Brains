@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
 import { Team, Clue, LeaderboardEntry } from '../types';
@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid'; // For unique file names
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmationModal from '../components/ConfirmationModal';
 import SkeletonLoader from '../components/SkeletonLoader';
+import { useToast } from '../components/Toast';
 
 const DOMAINS = ['Cybernetics', 'Quantum', 'Bio-Synth', 'Neutrino'];
 
@@ -136,6 +137,7 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
     const [newTeamDomain, setNewTeamDomain] = useState(DOMAINS[0]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const toast = useToast();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -182,8 +184,10 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
             } else {
                 setError(teamError.message);
             }
+            toast.error(`Failed to add team profile: ${teamError.message}`);
             alert(`CRITICAL ERROR: The team's login was created, but their team profile failed: ${teamError.message}. You must now go to the Supabase 'Authentication' page and manually delete the user '${newTeamEmail}' before trying again.`);
         } else {
+            toast.success(`Team "${newTeamName.trim()}" added successfully!`);
             onTeamAdded();
             setNewTeamName('');
             setNewTeamEmail('');
@@ -203,8 +207,8 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
                 <select value={newTeamDomain} onChange={(e) => setNewTeamDomain(e.target.value)} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500">
                     {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                 </select>
-                <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" disabled={loading}>
-                    {loading ? 'Creating...' : 'Add Team'}
+                <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={loading}>
+                    Add Team
                 </ GlowingButton>
                 {error && <p className="text-red-400 text-sm mt-2" role="alert">{error}</p>}
             </form>
@@ -220,6 +224,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
     const [deletingTeamId, setDeletingTeamId] = useState<number | null>(null);
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const toast = useToast();
 
     const openDeleteConfirm = (team: Team) => {
         setTeamToDelete(team);
@@ -256,6 +261,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
             // REMOVED: The call to the 'delete-user' Edge Function which was causing the error.
             // This restores the previous working behavior.
             
+            toast.success(`Team "${teamToDelete.name}" deleted successfully.`);
             onTeamsChanged();
             closeDeleteConfirm(); // Close modal on success
 
@@ -304,6 +310,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
                 setEditError('Failed to update team: ' + error.message);
             }
         } else {
+            toast.success(`Team "${editingTeam.name.trim()}" updated successfully.`);
             onTeamsChanged();
             handleCancelEdit();
         }
@@ -399,8 +406,8 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
                             </AnimatePresence>
                             <div className="flex space-x-4 justify-end pt-4">
                                 <button onClick={handleCancelEdit} className="px-4 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
-                                <GlowingButton onClick={handleUpdateTeam} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" disabled={isUpdating}>
-                                    {isUpdating ? 'Saving...' : 'Save Changes'}
+                                <GlowingButton onClick={handleUpdateTeam} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
+                                    Save Changes
                                 </GlowingButton>
                             </div>
                         </motion.div>
@@ -419,7 +426,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
     const [newClueImagePreview, setNewClueImagePreview] = useState<string | null>(null);
     const [isAdding, setIsAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
+    const toast = useToast();
     
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -489,6 +496,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
                 setError('Failed to add clue: ' + insertError.message);
             }
         } else {
+            toast.success('Clue added successfully!');
             setNewClueText('');
             setNewClueAnswer('');
             setNewClueDomain(DOMAINS[0]);
@@ -521,8 +529,8 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
                         <button type="button" onClick={() => { setNewClueImageFile(null); setNewClueImagePreview(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold">&times;</button>
                     </div>
                 )}
-                <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" disabled={isAdding}>
-                    {isAdding ? 'Adding...' : 'Add Clue'}
+                <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isAdding}>
+                    Add Clue
                 </GlowingButton>
                 {error && <p className="text-red-400 text-sm mt-2" role="alert">{error}</p>}
             </form>
@@ -538,6 +546,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
     const [editError, setEditError] = useState<string | null>(null);
     const [clueToDelete, setClueToDelete] = useState<Clue | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const toast = useToast();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -598,11 +607,12 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
         const { error } = await supabase.from('clues').delete().eq('id', clueToDelete.id);
         if (error) {
                 if (error.code === '42501' || error.message?.includes('permission denied')) {
-                alert('Database Permission Denied: Could not delete clue. Please check the RLS policies for the "clues" table to ensure DELETE permission is granted.');
+                toast.error('Database Permission Denied: Could not delete clue.');
             } else {
-                alert('Failed to delete clue: ' + error.message);
+                toast.error('Failed to delete clue: ' + error.message);
             }
         } else {
+            toast.success(`Clue #${clueToDelete.id} deleted successfully.`);
             onCluesChanged();
         }
         setIsDeleting(false);
@@ -655,6 +665,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                 setEditError('Failed to update clue: ' + error.message);
             }
         } else {
+            toast.success(`Clue #${editingClue.id} updated successfully.`);
             onCluesChanged();
             handleCancelEdit();
         }
@@ -766,8 +777,8 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                             </AnimatePresence>
                             <div className="flex space-x-4 justify-end pt-4">
                                 <button onClick={handleCancelEdit} className="px-4 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
-                                <GlowingButton onClick={handleUpdateClue} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" disabled={isUpdating}>
-                                    {isUpdating ? 'Saving...' : 'Save Changes'}
+                                <GlowingButton onClick={handleUpdateClue} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
+                                    Save Changes
                                 </GlowingButton>
                             </div>
                         </motion.div>
@@ -782,6 +793,7 @@ const EventControl: React.FC = () => {
     const [status, setStatus] = useState<'stopped' | 'running'>('stopped');
     const [startTime, setStartTime] = useState<string | null>(null);
     const [elapsedTime, setElapsedTime] = useState(0);
+    const timerRef = useRef<number | undefined>();
 
     useEffect(() => {
         const fetchEvent = async () => {
@@ -794,21 +806,34 @@ const EventControl: React.FC = () => {
         fetchEvent();
         const channel = supabase.channel('public:event')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchEvent)
-            .subscribe();
+            // FIX: The subscribe method was called without arguments. A callback function has been added to handle the subscription status.
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log('Subscribed to event updates');
+                }
+            });
         return () => { supabase.removeChannel(channel); };
     }, []);
 
     useEffect(() => {
-        let timer: number;
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+        }
+
         if (status === 'running' && startTime) {
-            timer = window.setInterval(() => {
+            timerRef.current = window.setInterval(() => {
                 const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
                 setElapsedTime(elapsed > 0 ? elapsed : 0);
             }, 1000);
         } else {
             setElapsedTime(0);
         }
-        return () => clearInterval(timer);
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
     }, [status, startTime]);
 
     const handleStart = async () => {
@@ -839,7 +864,7 @@ const EventControl: React.FC = () => {
                     {status === 'running' ? 'Running...' : 'Start Event'}
                 </GlowingButton>
                 <GlowingButton onClick={handleStop} className={`!border-red-500 group-hover:!bg-red-500 ${status !== 'running' ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={status !== 'running'}>
-                    Stop Event
+                    {status === 'running' ? 'Stop Event' : 'Event Stopped'}
                 </GlowingButton>
             </div>
         </div>
@@ -870,6 +895,7 @@ const LeaderboardView: React.FC = () => {
                 const solved = progress.filter(p => p.team_id === team.id);
                 const lastSolve = solved.length > 0 ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) : null;
                 return {
+                    id: team.id,
                     team: team.name,
                     coins: team.coins,
                     cluesSolved: solved.length,
@@ -878,10 +904,18 @@ const LeaderboardView: React.FC = () => {
             });
 
             board.sort((a, b) => {
+                // 1. Descending by clues solved
                 if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
+                // 2. Descending by coins
                 if (b.coins !== a.coins) return b.coins - a.coins;
-                if (a.lastSolveTime && b.lastSolveTime) return new Date(a.lastSolveTime).getTime() - new Date(b.lastSolveTime).getTime();
-                return 0;
+                // 3. Ascending by last solve time (earlier is better)
+                if (a.lastSolveTime && b.lastSolveTime) {
+                    const timeA = new Date(a.lastSolveTime).getTime();
+                    const timeB = new Date(b.lastSolveTime).getTime();
+                    if (timeA !== timeB) return timeA - timeB;
+                }
+                // 4. Tie-breaker: Ascending by Team ID for consistency
+                return a.id - b.id;
             });
             
             setLeaderboard(board.map((item, index) => ({ ...item, rank: index + 1 })));
@@ -889,9 +923,17 @@ const LeaderboardView: React.FC = () => {
         };
 
         fetchLeaderboard();
-        const channel = supabase.channel('public:team_progress')
+        // FIX: Subscribing to 'teams' table changes ensures the leaderboard updates when a team is deleted.
+        // Also using a more specific channel name to avoid potential conflicts.
+        const channel = supabase.channel('admin-leaderboard-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboard)
-            .subscribe();
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboard)
+            // FIX: The subscribe method expects a callback function to handle subscription status. This resolves the TypeScript error.
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log('Subscribed to leaderboard updates');
+                }
+            });
 
         return () => { supabase.removeChannel(channel); };
     }, []);

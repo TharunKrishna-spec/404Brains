@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
 import { useAuth } from '../hooks/useAuth';
@@ -37,6 +37,11 @@ const TeamDashboardSkeleton: React.FC = () => (
             <div className="text-center mb-8">
                 <SkeletonLoader className="h-12 w-1/2 mx-auto" />
                 <SkeletonLoader className="h-6 w-1/3 mx-auto mt-4" />
+            </div>
+            <div className="mb-8">
+                <SkeletonLoader className="h-6 w-1/3 mx-auto mb-3" />
+                <SkeletonLoader className="h-6 w-full rounded-full" />
+                <SkeletonLoader className="h-8 w-1/4 mx-auto mt-3" />
             </div>
             <div className="mb-8 p-4 bg-black/40 rounded-lg border border-dashed border-white/20">
                 <SkeletonLoader className="h-6 w-1/4 mx-auto mb-2" />
@@ -86,6 +91,7 @@ const TeamDashboardPage: React.FC = () => {
     const [currentAnswer, setCurrentAnswer] = useState<{ [clueId: number]: string }>({});
     const [submitStatus, setSubmitStatus] = useState<{ [clueId: number]: 'idle' | 'loading' | 'correct' | 'incorrect' }>({});
     const [awardedCoins, setAwardedCoins] = useState<{ [clueId: number]: number }>({});
+    const timerRef = useRef<number | undefined>();
     
     useEffect(() => {
         const fetchTeamData = async () => {
@@ -138,7 +144,12 @@ const TeamDashboardPage: React.FC = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchTeamData)
-            .subscribe();
+            // FIX: The subscribe method was called without arguments. A callback function has been added to handle the subscription status.
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log(`Subscribed to team dashboard updates for user ${user?.id}`);
+                }
+            });
 
         return () => { supabase.removeChannel(channel) };
 
@@ -146,7 +157,10 @@ const TeamDashboardPage: React.FC = () => {
 
     // Timer effect to sync with server start time
     useEffect(() => {
-        let timer: number;
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+        }
+
         if (eventStatus === 'running' && startTime) {
             const updateElapsedTime = () => {
                 const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
@@ -154,11 +168,16 @@ const TeamDashboardPage: React.FC = () => {
             };
             
             updateElapsedTime(); // Set initial time immediately
-            timer = window.setInterval(updateElapsedTime, 1000); // Update every second
+            timerRef.current = window.setInterval(updateElapsedTime, 1000); // Update every second
         } else {
             setElapsedTime(0); // Reset timer if event is stopped
         }
-        return () => clearInterval(timer); // Cleanup interval
+        
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
     }, [eventStatus, startTime]);
 
     const isSolved = (clueId: number) => {
@@ -216,14 +235,18 @@ const TeamDashboardPage: React.FC = () => {
             </div>
         )
     }
+    
+    const solvedCount = progress.length;
+    const totalClues = clues.length;
+    const progressPercentage = totalClues > 0 ? (solvedCount / totalClues) * 100 : 0;
 
     return (
         <PageTransition>
             <div className="relative w-full max-w-7xl mx-auto backdrop-blur-sm bg-black/30 p-4 sm:p-8 rounded-2xl border-2 border-[#ff7b00]/50">
-                <div className="absolute top-4 right-4 z-20">
+                <div className="absolute top-4 right-4 z-20 flex items-center gap-4">
                      <GlowingButton 
                         onClick={logout} 
-                        className="!py-2 !px-4 !border-red-500 group-hover:!bg-red-500 !text-sm"
+                        className="!py-1 !px-3 !border-red-500 group-hover:!bg-red-500 !text-xs"
                     >
                         Logout
                     </GlowingButton>
@@ -233,9 +256,26 @@ const TeamDashboardPage: React.FC = () => {
                         <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-glow">{team.name}</h1>
                         <p className="text-xl font-rajdhani text-gray-300 mt-2">Domain: <span className="font-bold text-[#ff7b00]">{team.domain}</span></p>
                     </div>
+
+                    {totalClues > 0 && (
+                        <div className="mb-8 px-2">
+                            <h3 className="text-xl font-orbitron text-center text-gray-400 uppercase tracking-widest mb-3">Mission Progress</h3>
+                            <div className="w-full bg-black/50 border-2 border-[#ff7b00]/30 rounded-full p-1 pulse-glow">
+                                <motion.div
+                                    className="h-4 bg-gradient-to-r from-[#ff7b00] to-yellow-400 rounded-full shadow-lg shadow-[#ff7b00]/50"
+                                    initial={{ width: '0%' }}
+                                    animate={{ width: `${progressPercentage}%` }}
+                                    transition={{ duration: 1, ease: [0.42, 0, 0.58, 1] }}
+                                />
+                            </div>
+                            <p className="text-center font-orbitron text-2xl mt-3 text-glow">
+                                {solvedCount} / {totalClues} <span className="text-lg text-gray-300">Clues Decrypted</span>
+                            </p>
+                        </div>
+                    )}
                     
                     {eventStatus === 'stopped' && (
-                        <div className="flex flex-col items-center justify-center text-center p-8 bg-black/40 border-2 border-dashed border-yellow-500/80 rounded-lg min-h-[50vh]">
+                        <div className="flex flex-col items-center justify-center text-center p-8 bg-black/40 border-2 border-dashed border-yellow-500/80 rounded-lg min-h-[40vh] mt-8">
                             <h2 className="text-4xl font-orbitron text-yellow-300">Awaiting Transmission...</h2>
                             <p className="mt-4 text-xl text-yellow-200 max-w-2xl">
                                 The event has not yet started. Please stand by. Clues for your domain will be broadcast here once the event is initiated by the administrator.
@@ -245,7 +285,7 @@ const TeamDashboardPage: React.FC = () => {
                     )}
                     
                     {eventStatus === 'running' && (
-                         <div className="text-center mb-8 p-4 bg-black/40 rounded-lg border border-dashed border-white/20">
+                         <div className="text-center my-8 p-4 bg-black/40 rounded-lg border border-dashed border-white/20">
                             <p className="text-lg text-gray-400 uppercase tracking-widest">Time Elapsed</p>
                             <div className="font-orbitron text-6xl font-black text-[#ff7b00] tracking-widest text-glow">
                                 {formatTime(elapsedTime)}
@@ -294,8 +334,12 @@ const TeamDashboardPage: React.FC = () => {
                                                                 `}
                                                                 disabled={status === 'loading' || status === 'correct'}
                                                             />
-                                                            <GlowingButton onClick={() => handleSubmitAnswer(clue.id)} disabled={status === 'loading' || status === 'correct' || !currentAnswer[clue.id]}>
-                                                                {status === 'loading' ? 'Submitting...' : 'Submit'}
+                                                            <GlowingButton 
+                                                                onClick={() => handleSubmitAnswer(clue.id)} 
+                                                                loading={status === 'loading'}
+                                                                disabled={status === 'correct' || !currentAnswer[clue.id]}
+                                                            >
+                                                                Submit
                                                             </GlowingButton>
                                                         </div>
                                                     )}
