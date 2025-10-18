@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404: Clue Not Found</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background-color: #000;
+        font-family: 'Rajdhani', sans-serif;
+      }
+      .font-orbitron {
+        font-family: 'Orbitron', sans-serif;
+      }
+      .font-rajdhani {
+        font-family: 'Rajdhani', sans-serif;
+      }
+       /* For glowing text effect */
+      .text-glow {
+        text-shadow: 0 0 5px #ff7b00, 0 0 10px #ff7b00;
+      }
+      .text-glow-blue {
+        text-shadow: 0 0 5px #00eaff, 0 0 10px #00eaff;
+      }
+      .text-glow-green {
+        text-shadow: 0 0 5px #0ff281, 0 0 10px #0ff281;
+      }
+
+      /* Global Wave Animation */
+      .animated-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        z-index: 0; /* Placed behind all page content */
+        overflow: hidden;
+      }
+      
+      .blob {
+        position: absolute;
+        width: 50vmax;
+        height: 50vmax;
+        border-radius: 50%;
+        filter: blur(150px);
+        opacity: 0.2;
+        will-change: transform;
+      }
+
+      .blob.one {
+          background-color: #ff7b00;
+          animation: moveWaveOne 20s ease-in-out infinite alternate;
+      }
+      .blob.two {
+          background-color: #00eaff;
+          animation: moveWaveTwo 25s ease-in-out infinite alternate-reverse;
+      }
+      .blob.three {
+          background-color: #be00ff; /* New color */
+          animation: moveWaveThree 30s ease-in-out infinite alternate;
+      }
+
+      @keyframes moveWaveOne {
+        0% { transform: translate(-10%, -10%) scale(1.1); }
+        25% { transform: translate(30%, -20%) scale(1.2); }
+        50% { transform: translate(40%, 40%) scale(0.9); }
+        75% { transform: translate(-20%, 30%) scale(1.3); }
+        100% { transform: translate(-10%, -10%) scale(1.1); }
+      }
+
+      @keyframes moveWaveTwo {
+        0% { transform: translate(100%, 100%) scale(1.2); }
+        25% { transform: translate(40%, 80%) scale(0.9); }
+        50% { transform: translate(20%, 10%) scale(1.1); }
+        75% { transform: translate(80%, 0%) scale(1.3); }
+        100% { transform: translate(100%, 100%) scale(1.2); }
+      }
+
+      @keyframes moveWaveThree {
+        0% { transform: translate(50%, 100%) scale(1.3); }
+        25% { transform: translate(100%, 20%) scale(1); }
+        50% { transform: translate(0%, 50%) scale(1.1); }
+        75% { transform: translate(20%, 100%) scale(0.9); }
+        100% { transform: translate(50%, 100%) scale(1.3); }
+      }
+
+
+      @keyframes pulse-glow-orange {
+        0%, 100% {
+          box-shadow: 0 0 10px rgba(255, 123, 0, 0.4), 0 0 20px rgba(255, 123, 0, 0.2);
+          border-color: rgba(255, 123, 0, 0.5);
+        }
+        50% {
+          box-shadow: 0 0 20px rgba(255, 123, 0, 0.7), 0 0 40px rgba(255, 123, 0, 0.4);
+          border-color: rgba(255, 123, 0, 1);
+        }
+      }
+      .pulse-glow {
+          animation: pulse-glow-orange 4s infinite ease-in-out;
+      }
+
+      @keyframes fadeInGlow {
+        0% { 
+            opacity: 0;
+            filter: blur(5px) drop-shadow(0 0 10px #00eaff);
+        }
+        70% {
+            opacity: 0.8;
+            filter: blur(1px) drop-shadow(0 0 15px #00eaff);
+        }
+        100% { 
+            opacity: 1;
+            filter: blur(0) drop-shadow(0 0 5px #00eaff);
+        }
+      }
+      .holographic-image {
+          animation: fadeInGlow 1s ease-out forwards;
+      }
+      
+      @keyframes shake {
+        10%, 90% { transform: translate3d(-1px, 0, 0); }
+        20%, 80% { transform: translate3d(2px, 0, 0); }
+        30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+        40%, 60% { transform: translate3d(4px, 0, 0); }
+      }
+      .animate-shake {
+        animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+      }
+      
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.45.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.4",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
