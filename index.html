@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -303,6 +302,93 @@
         animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
       }
       
+      /* --- NEW: Glitch Effect on Hover --- */
+      .glitch-effect {
+        position: relative;
+        cursor: pointer;
+      }
+
+      .glitch-effect::before,
+      .glitch-effect::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: black; /* Match page background */
+        overflow: hidden;
+        clip-path: inset(50% 50% 50% 50%); /* Start clipped */
+      }
+
+      .glitch-effect::before {
+        color: #00eaff; /* Cyan */
+        transform: translate(2px, -2px);
+      }
+
+      .glitch-effect::after {
+        color: #ff7b00; /* Orange */
+        transform: translate(-2px, 2px);
+      }
+
+      .glitch-effect:hover::before {
+        animation: glitch-anim-1 0.6s infinite linear alternate-reverse;
+      }
+
+      .glitch-effect:hover::after {
+        animation: glitch-anim-2 0.6s infinite linear alternate-reverse;
+      }
+
+      @keyframes glitch-anim-1 {
+        0% { clip-path: inset(45% 0 54% 0); transform: translate(-4px, 2px); }
+        20% { clip-path: inset(10% 0 85% 0); transform: translate(3px, -1px); }
+        40% { clip-path: inset(80% 0 5% 0); transform: translate(-2px, 4px); }
+        60% { clip-path: inset(25% 0 70% 0); transform: translate(4px, -3px); }
+        80% { clip-path: inset(60% 0 30% 0); transform: translate(-1px, 2px); }
+        100% { clip-path: inset(35% 0 62% 0); transform: translate(2px, -1px); }
+      }
+
+      @keyframes glitch-anim-2 {
+        0% { clip-path: inset(15% 0 80% 0); transform: translate(3px, -2px); }
+        20% { clip-path: inset(90% 0 2% 0); transform: translate(-4px, 3px); }
+        40% { clip-path: inset(40% 0 55% 0); transform: translate(2px, -4px); }
+        60% { clip-path: inset(75% 0 10% 0); transform: translate(-3px, 2px); }
+        80% { clip-path: inset(5% 0 92% 0); transform: translate(4px, -1px); }
+        100% { clip-path: inset(55% 0 40% 0); transform: translate(-2px, 3px); }
+      }
+      
+      /* --- NEW: Data Stream Typing Effect --- */
+      .typing-effect {
+        /* Use a CSS variable for character count */
+        --char-count: 20; 
+        width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        border-right: 0.15em solid #ff7b00; /* Blinking cursor */
+        animation: 
+          typing calc(var(--char-count) * 0.08s) steps(var(--char-count), end) forwards,
+          blink-caret 0.75s step-end infinite;
+      }
+
+      @keyframes typing {
+        from { width: 0; }
+        to { width: 100%; }
+      }
+
+      @keyframes blink-caret {
+        from, to { border-color: transparent; }
+        50% { border-color: #ff7b00; }
+      }
+
+      /* --- NEW: Hover effect for image delete buttons --- */
+      .image-delete-button {
+        transition: transform 0.2s ease, background-color 0.2s ease;
+      }
+      .image-delete-button:hover {
+        transform: scale(1.2);
+        background-color: #ef4444; /* Brighter red */
+      }
+
     </style>
   <script type="importmap">
 {

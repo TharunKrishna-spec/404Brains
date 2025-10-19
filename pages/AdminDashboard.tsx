@@ -328,10 +328,10 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
                             <p className="text-sm text-gray-400">Coins: {team.coins} | Domain: <span className="font-semibold text-gray-300">{team.domain}</span></p>
                         </div>
                         <div className="flex space-x-4">
-                            <button onClick={() => handleOpenEditModal(team)} className="text-sm text-yellow-400 hover:underline">Edit</button>
+                            <button onClick={() => handleOpenEditModal(team)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
                             <button 
                                 onClick={() => openDeleteConfirm(team)} 
-                                className="text-sm text-red-500 hover:underline"
+                                className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors"
                             >
                                 Delete
                             </button>
@@ -526,7 +526,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
                 {newClueImagePreview && (
                     <div className="mt-2 relative w-32">
                         <img src={newClueImagePreview} alt="Clue preview" className="rounded-md w-full h-auto" />
-                        <button type="button" onClick={() => { setNewClueImageFile(null); setNewClueImagePreview(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold">&times;</button>
+                        <button type="button" onClick={() => { setNewClueImageFile(null); setNewClueImagePreview(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold image-delete-button">&times;</button>
                     </div>
                 )}
                 <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isAdding}>
@@ -701,9 +701,9 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                                                 <img src={clue.image_url} alt={`Clue ${clue.id} image`} className="max-w-xs max-h-32 rounded-md" />
                                             </div>
                                         )}
-                                        <div className="flex space-x-2 mt-2">
-                                            <button onClick={() => handleOpenEditModal(clue)} className="text-sm text-yellow-400 hover:underline">Edit</button>
-                                            <button onClick={() => openDeleteConfirm(clue)} className="text-sm text-red-500 hover:underline">Delete</button>
+                                        <div className="flex space-x-4 mt-2">
+                                            <button onClick={() => handleOpenEditModal(clue)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
+                                            <button onClick={() => openDeleteConfirm(clue)} className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors">Delete</button>
                                         </div>
                                     </div>
                                 ))}
@@ -761,7 +761,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                                         {(editingClue.image_url || editingClueImageFile) && (
                                             <div className="relative w-24 h-24">
                                                 <img src={editingClueImageFile ? URL.createObjectURL(editingClueImageFile) : editingClue.image_url} alt="Current clue" className="rounded-md w-full h-full object-cover" />
-                                                <button type="button" onClick={() => { setEditingClue({ ...editingClue, image_url: undefined }); setEditingClueImageFile(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold">&times;</button>
+                                                <button type="button" onClick={() => { setEditingClue({ ...editingClue, image_url: undefined }); setEditingClueImageFile(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold image-delete-button">&times;</button>
                                             </div>
                                         )}
                                         <input type="file" accept="image/*" onChange={handleFileChange} className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#00eaff]/20 file:text-[#00eaff] hover:file:bg-[#00eaff]/30"/>

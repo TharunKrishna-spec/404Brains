@@ -35,19 +35,22 @@ const AnimatedLogo: React.FC = () => {
 
   return (
     <div className="text-center">
-      <motion.h1
-        className="font-orbitron text-5xl md:text-7xl lg:text-8xl font-black text-white uppercase tracking-widest text-glow-blue"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        aria-label={title}
-      >
-        {title.split("").map((char, index) => (
-          <motion.span key={index} variants={letterVariants} className="inline-block">
-            {char === " " ? "\u00A0" : char}
-          </motion.span>
-        ))}
-      </motion.h1>
+      {/* NEW: Wrapper div for glitch effect on hover */}
+      <div className="glitch-effect" data-text={title}>
+        <motion.h1
+          className="font-orbitron text-5xl md:text-7xl lg:text-8xl font-black text-white uppercase tracking-widest text-glow-blue"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          aria-label={title}
+        >
+          {title.split("").map((char, index) => (
+            <motion.span key={index} variants={letterVariants} className="inline-block">
+              {char === " " ? "\u00A0" : char}
+            </motion.span>
+          ))}
+        </motion.h1>
+      </div>
       <motion.p 
         className="mt-4 font-rajdhani text-lg md:text-xl text-[#ff7b00] uppercase tracking-[0.2em] text-glow"
         variants={taglineVariants}
