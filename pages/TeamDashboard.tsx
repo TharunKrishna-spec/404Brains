@@ -157,22 +157,35 @@ const TeamDashboardPage: React.FC = () => {
 
     // Timer effect to sync with server start time
     useEffect(() => {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-        }
-
+        // This effect manages the event timer, starting and stopping it based on the event status
+        // received from the server. It runs whenever the event status or start time changes.
+        
         if (eventStatus === 'running' && startTime) {
+            // The core logic for timer accuracy: calculate the elapsed time by comparing the
+            // client's current timestamp (Date.now()) with the server's start time. This ensures
+            // the timer is synchronized with the event, regardless of when the page was loaded.
             const updateElapsedTime = () => {
-                const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-                setElapsedTime(elapsed > 0 ? elapsed : 0);
+                const serverStartTime = new Date(startTime).getTime();
+                const elapsedSeconds = Math.floor((Date.now() - serverStartTime) / 1000);
+                
+                // Ensure the timer doesn't display a negative value.
+                setElapsedTime(Math.max(0, elapsedSeconds));
             };
             
-            updateElapsedTime(); // Set initial time immediately
-            timerRef.current = window.setInterval(updateElapsedTime, 1000); // Update every second
+            updateElapsedTime(); // Set the initial time immediately to avoid a 1-second delay.
+            
+            // Set up an interval to update the displayed time every second.
+            const intervalId = window.setInterval(updateElapsedTime, 1000);
+            timerRef.current = intervalId;
+
         } else {
-            setElapsedTime(0); // Reset timer if event is stopped
+            // If the event is not running, reset the timer to zero.
+            setElapsedTime(0);
         }
         
+        // Cleanup function: This is crucial. It runs when the component unmounts or when
+        // eventStatus/startTime change, clearing any existing interval to prevent memory leaks
+        // and multiple timers running simultaneously.
         return () => {
             if (timerRef.current) {
                 clearInterval(timerRef.current);
