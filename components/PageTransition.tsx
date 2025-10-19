@@ -24,11 +24,12 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
     },
   };
 
+  // FIX: Added 'as const' to ensure TypeScript infers the 'type' property as the literal 'spring', not the general 'string' type, which resolves the framer-motion Transition type error.
   const pageTransition = {
     type: 'spring',
     stiffness: 260,
     damping: 25,
-  };
+  } as const;
 
   return (
     <motion.div

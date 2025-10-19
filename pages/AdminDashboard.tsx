@@ -806,7 +806,6 @@ const EventControl: React.FC = () => {
         fetchEvent();
         const channel = supabase.channel('public:event')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchEvent)
-            // FIX: The subscribe method was called without arguments. A callback function has been added to handle the subscription status.
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     // console.log('Subscribed to event updates');
@@ -923,13 +922,11 @@ const LeaderboardView: React.FC = () => {
         };
 
         fetchLeaderboard();
-        // FIX: Subscribing to 'teams' table changes ensures the leaderboard updates when a team is deleted.
-        // Also using a more specific channel name to avoid potential conflicts.
         const channel = supabase.channel('admin-leaderboard-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboard)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboard)
-            // FIX: The subscribe method expects a callback function to handle subscription status. This resolves the TypeScript error.
-            .subscribe((status) => {
+            // FIX: The subscribe method requires a callback to handle subscription status, resolving the "Expected 1 arguments, but got 0" error.
+            .subscribe(status => {
                 if (status === 'SUBSCRIBED') {
                     // console.log('Subscribed to leaderboard updates');
                 }

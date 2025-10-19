@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
@@ -146,8 +147,8 @@ const TeamDashboardPage: React.FC = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchTeamData)
-            // FIX: The subscribe method was called without arguments. A callback function has been added to handle the subscription status.
-            .subscribe((status) => {
+            // FIX: The subscribe method requires a callback to handle subscription status, resolving the "Expected 1 arguments, but got 0" error.
+            .subscribe(status => {
                 if (status === 'SUBSCRIBED') {
                     // console.log(`Subscribed to team dashboard updates for user ${user?.id}`);
                 }
