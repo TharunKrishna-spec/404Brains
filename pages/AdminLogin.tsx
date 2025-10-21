@@ -28,8 +28,8 @@ const AdminLoginPage: React.FC = () => {
 
   return (
     <PageTransition>
-      <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto">
-        <h1 className="text-5xl font-orbitron font-bold mb-8 text-glow-blue">Admin Portal</h1>
+      <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto flex-grow">
+        <h1 className="text-5xl font-orbitron font-bold mb-8 text-glow-blue text-center">Admin Portal</h1>
         <form onSubmit={handleLogin} className="w-full p-8 space-y-6 bg-black bg-opacity-50 border-2 border-[#00eaff] rounded-lg shadow-2xl shadow-[#00eaff]/20">
           <div className="relative">
             <input 

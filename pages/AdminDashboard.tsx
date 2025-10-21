@@ -18,13 +18,11 @@ const KeyIcon: React.FC<{className?:string}> = ({className}) => <svg className={
 const ControlIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>;
 const LeaderboardIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
 const ViewIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
-
-const formatTime = (seconds: number): string => {
-    const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
-    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${h}:${m}:${s}`;
-};
+const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 10M20 20l-1.5-1.5A9 9 0 013.5 14" />
+    </svg>
+);
 
 type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard';
 
@@ -216,7 +214,7 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
     );
 };
 
-const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void }> = ({ teams, onTeamsChanged }) => {
+const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promise<void> }> = ({ teams, onTeamsChanged }) => {
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
@@ -225,6 +223,20 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const toast = useToast();
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefresh = async () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        try {
+            await onTeamsChanged();
+            toast.info("Team list has been refreshed.");
+        } catch (e) {
+            toast.error("Failed to refresh team list.");
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const openDeleteConfirm = (team: Team) => {
         setTeamToDelete(team);
@@ -319,7 +331,17 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => void 
 
     return (
         <div>
-            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">View & Edit Teams</h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-orbitron text-[#00eaff]">View & Edit Teams</h2>
+                <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                    aria-label="Refresh teams list"
+                >
+                    <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 {teams.map(team => (
                     <div key={team.id} className="p-4 bg-white/5 rounded-lg flex justify-between items-center">
@@ -538,8 +560,8 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
     );
 };
 
-const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void }> = ({ clues, onCluesChanged }) => {
-    const [editingClue, setEditingClue] = useState<Clue | null>(null);
+const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => Promise<void> }> = ({ clues, onCluesChanged }) => {
+    const [editingClue, setEditingClue] = useState<{ clue: Clue; index: number } | null>(null);
     const [editingClueImageFile, setEditingClueImageFile] = useState<File | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
@@ -547,6 +569,20 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
     const [clueToDelete, setClueToDelete] = useState<Clue | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const toast = useToast();
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefresh = async () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        try {
+            await onCluesChanged();
+            toast.info("Clue list has been refreshed.");
+        } catch (e) {
+            toast.error("Failed to refresh clue list.");
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -612,15 +648,15 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                 toast.error('Failed to delete clue: ' + error.message);
             }
         } else {
-            toast.success(`Clue #${clueToDelete.id} deleted successfully.`);
+            toast.success(`Clue deleted successfully.`);
             onCluesChanged();
         }
         setIsDeleting(false);
         closeDeleteConfirm();
     };
     
-    const handleOpenEditModal = (clue: Clue) => {
-        setEditingClue({ ...clue });
+    const handleOpenEditModal = (clue: Clue, index: number) => {
+        setEditingClue({ clue: { ...clue }, index });
         setEditingClueImageFile(null);
         setEditError(null);
         setIsEditModalOpen(true);
@@ -634,14 +670,14 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
     };
     
     const handleUpdateClue = async () => {
-        if (!editingClue || !editingClue.text.trim() || !editingClue.answer.trim()) {
+        if (!editingClue || !editingClue.clue.text.trim() || !editingClue.clue.answer.trim()) {
             setEditError('Clue text and answer cannot be empty.');
             return;
         }
         setIsUpdating(true);
         setEditError(null);
 
-        let imageUrl = editingClue.image_url;
+        let imageUrl = editingClue.clue.image_url;
         if (editingClueImageFile) {
             const uploadedUrl = await uploadImage(editingClueImageFile);
             if (!uploadedUrl) {
@@ -652,11 +688,11 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
         }
 
         const { error } = await supabase.from('clues').update({
-            text: editingClue.text.trim(),
-            answer: editingClue.answer.trim().toUpperCase(),
+            text: editingClue.clue.text.trim(),
+            answer: editingClue.clue.answer.trim().toUpperCase(),
             image_url: imageUrl,
-            domain: editingClue.domain,
-        }).eq('id', editingClue.id).select();
+            domain: editingClue.clue.domain,
+        }).eq('id', editingClue.clue.id).select();
 
         if (error) {
              if (error.code === '42501' || error.message?.includes('permission denied')) {
@@ -665,7 +701,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                 setEditError('Failed to update clue: ' + error.message);
             }
         } else {
-            toast.success(`Clue #${editingClue.id} updated successfully.`);
+            toast.success(`Clue #${editingClue.index + 1} in ${editingClue.clue.domain} updated successfully.`);
             onCluesChanged();
             handleCancelEdit();
         }
@@ -683,7 +719,17 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
 
     return (
          <div>
-            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">View & Edit Clues</h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-orbitron text-[#00eaff]">View & Edit Clues</h2>
+                <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                    aria-label="Refresh clues list"
+                >
+                    <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
             <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
                 {DOMAINS.map(domain => {
                     const domainClues = cluesByDomain[domain] || [];
@@ -692,17 +738,17 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                             <h4 className="text-2xl font-orbitron text-gray-400 border-b-2 border-gray-700 pb-2 mb-4">{domain} ({domainClues.length} clues)</h4>
                             {domainClues.length > 0 ? (
                                 <div className="space-y-4">
-                                {domainClues.map(clue => (
+                                {domainClues.map((clue, index) => (
                                     <div key={clue.id} className="p-4 bg-white/5 rounded-lg">
-                                        <p className="font-semibold text-lg">Clue #{clue.id}: <span className="font-light text-gray-300">"{clue.text}"</span></p>
+                                        <p className="font-semibold text-lg">Clue #{index + 1}: <span className="font-light text-gray-300">"{clue.text}"</span></p>
                                         <p className="font-semibold text-md mt-1">Answer: <span className="font-mono text-green-400 bg-black/30 px-2 py-1 rounded">{clue.answer}</span></p>
                                         {clue.image_url && (
                                             <div className="mt-2">
-                                                <img src={clue.image_url} alt={`Clue ${clue.id} image`} className="max-w-xs max-h-32 rounded-md" />
+                                                <img src={clue.image_url} alt={`Clue image`} className="max-w-xs max-h-32 rounded-md" />
                                             </div>
                                         )}
                                         <div className="flex space-x-4 mt-2">
-                                            <button onClick={() => handleOpenEditModal(clue)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
+                                            <button onClick={() => handleOpenEditModal(clue, index)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
                                             <button onClick={() => openDeleteConfirm(clue)} className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors">Delete</button>
                                         </div>
                                     </div>
@@ -721,7 +767,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                 onClose={closeDeleteConfirm}
                 onConfirm={handleDeleteClue}
                 title="Confirm Clue Deletion"
-                message={<p>Are you sure you want to permanently delete Clue #{clueToDelete?.id}? This action cannot be undone.</p>}
+                message={<p>Are you sure you want to permanently delete the clue: <strong className="font-bold text-white">"{clueToDelete?.text}"</strong>? This action cannot be undone.</p>}
                 isConfirming={isDeleting}
             />
 
@@ -742,26 +788,26 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                             className="relative w-full max-w-lg bg-black border-2 border-[#00eaff] rounded-lg p-6 space-y-4"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit Clue #{editingClue.id}</h3>
+                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit {editingClue.clue.domain} Clue #{editingClue.index + 1}</h3>
                             <div className="space-y-3">
                                 <label className="block text-sm font-bold text-gray-400">Domain</label>
-                                <select value={editingClue.domain} onChange={(e) => setEditingClue({ ...editingClue, domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
+                                <select value={editingClue.clue.domain} onChange={(e) => setEditingClue({ ...editingClue, clue: { ...editingClue.clue, domain: e.target.value } })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
                                     {DOMAINS.map(d => <option key={d} value={d} className="bg-black">{d}</option>)}
                                 </select>
                                 
                                 <label className="block text-sm font-bold text-gray-400">Clue Text</label>
-                                <textarea value={editingClue.text} onChange={(e) => setEditingClue({ ...editingClue, text: e.target.value })} className="w-full h-24 px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue text"/>
+                                <textarea value={editingClue.clue.text} onChange={(e) => setEditingClue({ ...editingClue, clue: { ...editingClue.clue, text: e.target.value } })} className="w-full h-24 px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue text"/>
                                 
                                 <label className="block text-sm font-bold text-gray-400">Answer</label>
-                                <input type="text" value={editingClue.answer} onChange={(e) => setEditingClue({ ...editingClue, answer: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue answer"/>
+                                <input type="text" value={editingClue.clue.answer} onChange={(e) => setEditingClue({ ...editingClue, clue: { ...editingClue.clue, answer: e.target.value } })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue answer"/>
                                 
                                 <div>
                                     <label className="block text-sm font-bold text-gray-400">Clue Image (Optional)</label>
                                     <div className="flex items-center gap-4 mt-2">
-                                        {(editingClue.image_url || editingClueImageFile) && (
+                                        {(editingClue.clue.image_url || editingClueImageFile) && (
                                             <div className="relative w-24 h-24">
-                                                <img src={editingClueImageFile ? URL.createObjectURL(editingClueImageFile) : editingClue.image_url} alt="Current clue" className="rounded-md w-full h-full object-cover" />
-                                                <button type="button" onClick={() => { setEditingClue({ ...editingClue, image_url: undefined }); setEditingClueImageFile(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold image-delete-button">&times;</button>
+                                                <img src={editingClueImageFile ? URL.createObjectURL(editingClueImageFile) : editingClue.clue.image_url} alt="Current clue" className="rounded-md w-full h-full object-cover" />
+                                                <button type="button" onClick={() => { setEditingClue({ ...editingClue, clue: { ...editingClue.clue, image_url: undefined } }); setEditingClueImageFile(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold image-delete-button">&times;</button>
                                             </div>
                                         )}
                                         <input type="file" accept="image/*" onChange={handleFileChange} className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#00eaff]/20 file:text-[#00eaff] hover:file:bg-[#00eaff]/30"/>
@@ -791,16 +837,15 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
 
 const EventControl: React.FC = () => {
     const [status, setStatus] = useState<'stopped' | 'running'>('stopped');
-    const [startTime, setStartTime] = useState<string | null>(null);
-    const [elapsedTime, setElapsedTime] = useState(0);
-    const timerRef = useRef<number | undefined>();
+    const [isStartConfirmOpen, setIsStartConfirmOpen] = useState(false);
+    const [isStartingEvent, setIsStartingEvent] = useState(false);
+    const toast = useToast();
 
     useEffect(() => {
         const fetchEvent = async () => {
-            const { data } = await supabase.from('event').select('*').eq('id', 1).single();
+            const { data } = await supabase.from('event').select('status').eq('id', 1).single();
             if (data) {
                 setStatus(data.status);
-                setStartTime(data.start_time);
             }
         };
         fetchEvent();
@@ -813,37 +858,44 @@ const EventControl: React.FC = () => {
             });
         return () => { supabase.removeChannel(channel); };
     }, []);
-
-    useEffect(() => {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
+    
+    const confirmStartEvent = async () => {
+        setIsStartingEvent(true);
+        try {
+            // Step 1: Delete all progress records
+            const { error: progressError } = await supabase.from('team_progress').delete().gt('team_id', 0);
+            if (progressError) throw progressError;
+    
+            // Step 2: Reset all team coins to 0
+            const { error: teamsError } = await supabase.from('teams').update({ coins: 0 }).gt('id', 0);
+            if (teamsError) throw teamsError;
+    
+            // Step 3: Start the event
+            const { error: eventError } = await supabase.from('event').update({ status: 'running', start_time: new Date().toISOString() }).eq('id', 1);
+            if (eventError) throw eventError;
+    
+            toast.success("Event started! All team progress has been reset.");
+            setIsStartConfirmOpen(false);
+        } catch (e: any) {
+            const errorMessage = e.message?.includes('permission denied') 
+                ? 'Database Permission Denied. Please check Supabase RLS policies.'
+                : e.message;
+            toast.error(`Failed to start event: ${errorMessage}`);
+            console.error(e);
+        } finally {
+            setIsStartingEvent(false);
         }
+    }
 
-        if (status === 'running' && startTime) {
-            timerRef.current = window.setInterval(() => {
-                const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-                setElapsedTime(elapsed > 0 ? elapsed : 0);
-            }, 1000);
-        } else {
-            setElapsedTime(0);
-        }
-
-        return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
-        };
-    }, [status, startTime]);
-
-    const handleStart = async () => {
+    const handleStart = () => {
         if (status === 'stopped') {
-            await supabase.from('event').update({ status: 'running', start_time: new Date().toISOString() }).eq('id', 1);
+            setIsStartConfirmOpen(true);
         }
     };
     
     const handleStop = async () => {
         if (status === 'running') {
-            if (window.confirm('Are you sure you want to stop the event? This will reset the timer.')) {
+            if (window.confirm('Are you sure you want to stop the event? This will pause the game for all teams.')) {
                  await supabase.from('event').update({ status: 'stopped', start_time: null }).eq('id', 1);
             }
         }
@@ -853,9 +905,9 @@ const EventControl: React.FC = () => {
         <div>
             <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Event Control</h2>
             <div className="text-center p-8 bg-black/40 rounded-lg border border-dashed border-white/20">
-                <p className="text-xl mb-4">Event Timer</p>
-                <div className="font-orbitron text-7xl font-black text-[#00eaff] tracking-widest">
-                    {formatTime(elapsedTime)}
+                <p className="text-xl mb-4 font-bold">Event Status</p>
+                <div className={`font-orbitron text-5xl font-black tracking-widest ${status === 'running' ? 'text-green-400 text-glow-green' : 'text-red-500'}`}>
+                    {status === 'running' ? 'LIVE' : 'STOPPED'}
                 </div>
             </div>
             <div className="flex justify-center space-x-6 mt-8">
@@ -866,6 +918,21 @@ const EventControl: React.FC = () => {
                     {status === 'running' ? 'Stop Event' : 'Event Stopped'}
                 </GlowingButton>
             </div>
+             <ConfirmationModal
+                isOpen={isStartConfirmOpen}
+                onClose={() => setIsStartConfirmOpen(false)}
+                onConfirm={confirmStartEvent}
+                title="Confirm Event Start"
+                message={
+                    <div className="space-y-2">
+                        <p>Starting the event will <strong className="font-bold text-yellow-300">reset all team progress and scores to zero.</strong></p>
+                        <p className="text-gray-400">This action cannot be undone. Are you sure you want to proceed?</p>
+                    </div>
+                }
+                confirmText="Start & Reset"
+                confirmButtonClassName="!py-2 !px-6 !border-green-500 group-hover:!bg-green-500"
+                isConfirming={isStartingEvent}
+            />
         </div>
     );
 };
@@ -925,7 +992,7 @@ const LeaderboardView: React.FC = () => {
         const channel = supabase.channel('admin-leaderboard-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboard)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboard)
-            // FIX: The subscribe method requires a callback to handle subscription status, resolving the "Expected 1 arguments, but got 0" error.
+            // FIX: The `subscribe` method requires a callback argument to handle subscription status, which was missing.
             .subscribe(status => {
                 if (status === 'SUBSCRIBED') {
                     // console.log('Subscribed to leaderboard updates');

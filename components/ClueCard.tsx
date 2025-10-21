@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlowingButton from './GlowingButton';
@@ -8,22 +7,32 @@ const CheckIcon: React.FC<{className?:string}> = ({className}) => <svg className
 
 interface ClueCardProps {
     clue: Clue;
+    clueNumber: number;
     isSolved: boolean;
     status: 'idle' | 'loading' | 'correct' | 'incorrect';
     currentAnswer: string;
     awardedCoins: number | undefined;
+    isActive: boolean;
     onAnswerChange: (clueId: number, value: string) => void;
     onSubmitAnswer: (clueId: number) => void;
 }
 
-const ClueCard: React.FC<ClueCardProps> = ({ clue, isSolved, status, currentAnswer, awardedCoins, onAnswerChange, onSubmitAnswer }) => {
+const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status, currentAnswer, awardedCoins, isActive, onAnswerChange, onSubmitAnswer }) => {
+    
+    const isCurrentlyActive = isActive && !isSolved;
+    
     return (
-        <div className={`p-4 rounded-lg bg-black/40 border-2 transition-colors duration-500 ${isSolved ? 'border-green-500/70' : 'border-white/20'}`}>
+        <div className={`p-4 rounded-lg bg-black/40 border-2 transition-all duration-500 ${!isActive && !isSolved ? 'opacity-60' : ''} ${isSolved ? 'border-green-500/70' : isCurrentlyActive ? 'border-[#ff7b00]/80' : 'border-white/20'}`}>
             <div className="flex justify-between items-start">
-                <p className="font-semibold text-xl">Clue #{clue.id}</p>
-                {isSolved && <div className="px-3 py-1 bg-green-500/30 text-green-300 font-bold text-sm rounded-full flex items-center gap-2"><CheckIcon className="w-4 h-4" /> Solved</div>}
+                <p className="font-semibold text-xl">Clue #{clueNumber}</p>
+                {isSolved ? (
+                     <div className="px-3 py-1 bg-green-500/30 text-green-300 font-bold text-sm rounded-full flex items-center gap-2"><CheckIcon className="w-4 h-4" /> Solved</div>
+                ) : isCurrentlyActive ? (
+                    <div className="px-3 py-1 bg-yellow-500/30 text-yellow-300 font-bold text-sm rounded-full flex items-center gap-2">ACTIVE</div>
+                ) : (
+                    <div className="px-3 py-1 bg-gray-500/30 text-gray-300 font-bold text-sm rounded-full flex items-center gap-2">LOCKED</div>
+                )}
             </div>
-            {/* NEW: Added typing effect class and style for char count */}
             <p 
                 className="text-gray-300 mt-2 text-lg typing-effect"
                 style={{ '--char-count': clue.text.length } as React.CSSProperties}
@@ -32,10 +41,11 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, isSolved, status, currentAnsw
             </p>
             {clue.image_url && (
                 <div className="mt-4">
-                    <img src={clue.image_url} alt={`Clue ${clue.id} image`} className="max-w-sm rounded-md shadow-lg holographic-image" />
+                    <img src={clue.image_url} alt={`Clue image`} className="max-w-sm rounded-md shadow-lg holographic-image" />
                 </div>
             )}
-            {!isSolved && (
+            
+            {isCurrentlyActive && (
                 <div className="mt-4 flex flex-col sm:flex-row gap-2">
                     <input 
                         type="text" 
@@ -58,6 +68,14 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, isSolved, status, currentAnsw
                     </GlowingButton>
                 </div>
             )}
+            
+            {!isSolved && !isActive && (
+                <div className="mt-4 p-3 text-center bg-black/50 rounded-md border border-dashed border-gray-600">
+                    <p className="font-orbitron text-gray-400">STATUS: LOCKED</p>
+                    <p className="text-sm text-gray-500">Solve the previous clue to decrypt this transmission.</p>
+                </div>
+            )}
+
              <AnimatePresence>
                 {status === 'incorrect' && (
                     <motion.p initial={{height: 0, opacity:0}} animate={{height: 'auto', opacity: 1}} exit={{height: 0, opacity: 0}} className="text-red-400 font-bold text-sm mt-2">

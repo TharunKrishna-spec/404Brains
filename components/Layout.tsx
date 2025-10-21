@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { useLocation, Link } from 'react-router-dom';
+import { VOICE_IT_LOGO } from '../assets/images';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +18,8 @@ interface ClickWave {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [clickWaves, setClickWaves] = useState<ClickWave[]>([]);
+  const location = useLocation();
+  const showLogo = location.pathname !== '/';
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -59,6 +63,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         className="min-h-screen w-full bg-black text-white font-rajdhani"
         onClick={handleLayoutClick}
     >
+      {showLogo && (
+        <Link to="/" className="absolute top-4 left-4 z-50 group" aria-label="Back to dashboard">
+          <img 
+            src={VOICE_IT_LOGO} 
+            alt="Voice-It Club Logo"
+            className="w-16 h-16 rounded-full border-2 border-[#ff7b00]/50 shadow-lg shadow-[#ff7b00]/20 transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl group-hover:shadow-[#ff7b00]/40"
+          />
+        </Link>
+      )}
       <div 
         className="animated-background transition-transform duration-500 ease-out" 
         style={{ transform: `translate(${parallaxX}px, ${parallaxY}px)` }}
@@ -70,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         
         {/* Rising embers/sparks */}
         <div className="particle-container">
-          {Array.from({ length: 80 }).map((_, i) => (
+          {Array.from({ length: 150 }).map((_, i) => (
             <div key={i} className="particle"></div>
           ))}
         </div>
@@ -88,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ))}
         
       </div>
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
+      <main className="relative z-10 flex flex-col items-center min-h-screen p-4">
         {children}
       </main>
     </div>

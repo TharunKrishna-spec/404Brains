@@ -1,6 +1,4 @@
-
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
 import { useAuth } from '../hooks/useAuth';
@@ -10,10 +8,12 @@ import LiveLeaderboard from '../components/LiveLeaderboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import SkeletonLoader from '../components/SkeletonLoader';
 import ClueCard from '../components/ClueCard';
+import { useToast } from '../components/Toast';
 
 const CheckIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
 
 const formatTime = (seconds: number): string => {
+    if (isNaN(seconds) || seconds < 0) return '00:00:00';
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
     const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
@@ -90,11 +90,11 @@ const TeamDashboardPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [eventStatus, setEventStatus] = useState<'stopped' | 'running'>('stopped');
     const [startTime, setStartTime] = useState<string | null>(null);
-    const [elapsedTime, setElapsedTime] = useState(0);
+    const [activeClueElapsedTime, setActiveClueElapsedTime] = useState(0);
     const [currentAnswer, setCurrentAnswer] = useState<{ [clueId: number]: string }>({});
     const [submitStatus, setSubmitStatus] = useState<{ [clueId: number]: 'idle' | 'loading' | 'correct' | 'incorrect' }>({});
     const [awardedCoins, setAwardedCoins] = useState<{ [clueId: number]: number }>({});
-    const timerRef = useRef<number | undefined>();
+    const toast = useToast();
     
     useEffect(() => {
         const fetchTeamData = async () => {
@@ -147,58 +147,71 @@ const TeamDashboardPage: React.FC = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchTeamData)
-            // FIX: The subscribe method requires a callback to handle subscription status, resolving the "Expected 1 arguments, but got 0" error.
+            // FIX: The `subscribe` method requires a callback argument. Added a callback to resolve the "Expected 1 arguments, but got 0" error.
             .subscribe(status => {
                 if (status === 'SUBSCRIBED') {
                     // console.log(`Subscribed to team dashboard updates for user ${user?.id}`);
                 }
             });
 
-        return () => { supabase.removeChannel(channel) };
+        return () => { 
+            supabase.removeChannel(channel);
+        };
 
     }, [user]);
 
-    // Timer effect to sync with server start time
+    const sortedClues = useMemo(() => [...clues].sort((a, b) => a.id - b.id), [clues]);
+    const progressMap = useMemo(() => {
+        const map = new Map<number, TeamProgress>();
+        progress.forEach(p => map.set(p.clue_id, p));
+        return map;
+    }, [progress]);
+    
+    // Memoize the active clue's start time for scoring calculations.
+    const activeClueInfo = useMemo(() => {
+        const activeIndex = sortedClues.findIndex((clue, index) => {
+            const isSolved = progressMap.has(clue.id);
+            if (isSolved) return false;
+            const isUnlocked = index === 0 || progressMap.has(sortedClues[index - 1].id);
+            return isUnlocked;
+        });
+
+        if (activeIndex === -1) return null;
+
+        const activeClue = sortedClues[activeIndex];
+        // For the first clue, its start time is the global event start time.
+        // For subsequent clues, its start time is when the previous clue was solved.
+        let clueStartTime = (activeIndex === 0) 
+            ? startTime 
+            : progressMap.get(sortedClues[activeIndex - 1].id)?.solved_at ?? null;
+        
+        return { clueId: activeClue.id, startTime: clueStartTime };
+    }, [sortedClues, progressMap, startTime]);
+
     useEffect(() => {
-        // This effect manages the event timer, starting and stopping it based on the event status
-        // received from the server. It runs whenever the event status or start time changes.
-        
-        if (eventStatus === 'running' && startTime) {
-            // The core logic for timer accuracy: calculate the elapsed time by comparing the
-            // client's current timestamp (Date.now()) with the server's start time. This ensures
-            // the timer is synchronized with the event, regardless of when the page was loaded.
-            const updateElapsedTime = () => {
-                const serverStartTime = new Date(startTime).getTime();
-                const elapsedSeconds = Math.floor((Date.now() - serverStartTime) / 1000);
-                
-                // Ensure the timer doesn't display a negative value.
-                setElapsedTime(Math.max(0, elapsedSeconds));
-            };
-            
-            updateElapsedTime(); // Set the initial time immediately to avoid a 1-second delay.
-            
-            // Set up an interval to update the displayed time every second.
-            const intervalId = window.setInterval(updateElapsedTime, 1000);
-            timerRef.current = intervalId;
+        // Timer for the currently active clue.
+        if (eventStatus === 'running' && activeClueInfo?.startTime) {
+            const timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - new Date(activeClueInfo.startTime!).getTime()) / 1000);
+                setActiveClueElapsedTime(elapsed >= 0 ? elapsed : 0);
+            }, 1000);
 
+            return () => clearInterval(timerInterval);
         } else {
-            // If the event is not running, reset the timer to zero.
-            setElapsedTime(0);
+            // If no active clue or event stopped, reset timer display.
+            setActiveClueElapsedTime(0);
         }
-        
-        // Cleanup function: This is crucial. It runs when the component unmounts or when
-        // eventStatus/startTime change, clearing any existing interval to prevent memory leaks
-        // and multiple timers running simultaneously.
-        return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
-        };
-    }, [eventStatus, startTime]);
+    }, [activeClueInfo, eventStatus]);
 
-    const isSolved = (clueId: number) => {
-        return progress.some(p => p.clue_id === clueId);
-    };
+    useEffect(() => {
+        // This effect provides an extra guarantee that the timer is zeroed out
+        // as soon as the event status changes to 'stopped', ensuring immediate
+        // synchronization with the admin's action.
+        if (eventStatus === 'stopped') {
+            setActiveClueElapsedTime(0);
+        }
+    }, [eventStatus]);
+
 
     const handleAnswerChange = (clueId: number, value: string) => {
         setCurrentAnswer(prev => ({ ...prev, [clueId]: value }));
@@ -213,23 +226,61 @@ const TeamDashboardPage: React.FC = () => {
         setSubmitStatus(prev => ({ ...prev, [clueId]: 'loading' }));
         const submittedAnswer = currentAnswer[clueId].trim().toUpperCase();
 
-        const clue = clues.find(c => c.id === clueId);
+        const clue = sortedClues.find(c => c.id === clueId);
         if (!clue) return;
 
         if (clue.answer === submittedAnswer) {
-             setSubmitStatus(prev => ({ ...prev, [clueId]: 'correct' }));
-             
-             let coinsToAdd = 10;
-             if (elapsedTime <= 5 * 60) { // 5 minutes
-                coinsToAdd = 30;
-             } else if (elapsedTime <= 10 * 60) { // 10 minutes
-                coinsToAdd = 20;
-             }
-             setAwardedCoins(prev => ({ ...prev, [clueId]: coinsToAdd }));
+            const solveTime = new Date();
+            
+            const clueStartTime = activeClueInfo?.startTime;
+            if (!clueStartTime) {
+                toast.error("Scoring Error: Could not determine clue start time.");
+                setSubmitStatus(prev => ({ ...prev, [clueId]: 'idle' }));
+                return;
+            }
+            const elapsedSeconds = Math.floor((solveTime.getTime() - new Date(clueStartTime).getTime()) / 1000);
 
-             await supabase.from('team_progress').insert({ team_id: team.id, clue_id: clueId });
-             const newCoins = (team.coins || 0) + coinsToAdd;
-             await supabase.from('teams').update({ coins: newCoins }).eq('id', team.id);
+            let coinsToAdd = 10;
+            if (elapsedSeconds <= 5 * 60) {
+                coinsToAdd = 30;
+            } else if (elapsedSeconds <= 10 * 60) {
+                coinsToAdd = 20;
+            }
+            
+            setAwardedCoins(prev => ({ ...prev, [clueId]: coinsToAdd }));
+            setSubmitStatus(prev => ({ ...prev, [clueId]: 'correct' }));
+
+            try {
+                const { error: progressError } = await supabase.from('team_progress').insert({ team_id: team.id, clue_id: clueId, solved_at: solveTime.toISOString() });
+                if (progressError) throw progressError;
+
+                const newCoins = (team.coins || 0) + coinsToAdd;
+                const { error: teamUpdateError } = await supabase.from('teams').update({ coins: newCoins }).eq('id', team.id);
+                if (teamUpdateError) throw teamUpdateError;
+
+                // FIX: Force immediate local state update to reset timer without waiting for realtime broadcast.
+                const newProgressRecord: TeamProgress = { team_id: team.id, clue_id: clueId, solved_at: solveTime.toISOString() };
+                setProgress(prev => [...prev, newProgressRecord]);
+                setTeam(prev => prev ? { ...prev, coins: newCoins } : null);
+                setCurrentAnswer(prev => {
+                    const newState = { ...prev };
+                    delete newState[clueId];
+                    return newState;
+                });
+
+            } catch (error: any) {
+                console.error("Error submitting answer progress:", error);
+                toast.error(`Submission failed: ${error.message}. Please contact an admin.`);
+                
+                // Revert optimistic UI update on failure
+                setSubmitStatus(prev => ({ ...prev, [clueId]: 'idle' }));
+                setAwardedCoins(prev => {
+                    const newAwards = {...prev};
+                    delete newAwards[clueId];
+                    return newAwards;
+                });
+            }
+
         } else {
             setSubmitStatus(prev => ({ ...prev, [clueId]: 'incorrect' }));
             setTimeout(() => {
@@ -271,6 +322,9 @@ const TeamDashboardPage: React.FC = () => {
                     <div className="text-center mb-8">
                         <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-glow">{team.name}</h1>
                         <p className="text-xl font-rajdhani text-gray-300 mt-2">Domain: <span className="font-bold text-[#ff7b00]">{team.domain}</span></p>
+                        <p className="text-2xl font-orbitron text-gray-200 mt-4">
+                            Total Coins: <span className="font-bold text-yellow-400 text-glow">{team.coins} 🪙</span>
+                        </p>
                     </div>
 
                     {totalClues > 0 && (
@@ -299,15 +353,6 @@ const TeamDashboardPage: React.FC = () => {
                             <div className="mt-6 text-6xl animate-pulse">⏳</div>
                         </div>
                     )}
-                    
-                    {eventStatus === 'running' && (
-                         <div className="text-center my-8 p-4 bg-black/40 rounded-lg border border-dashed border-white/20">
-                            <p className="text-lg text-gray-400 uppercase tracking-widest">Time Elapsed</p>
-                            <div className="font-orbitron text-6xl font-black text-[#ff7b00] tracking-widest text-glow">
-                                {formatTime(elapsedTime)}
-                            </div>
-                        </div>
-                    )}
 
                     <AnimatePresence>
                     {eventStatus === 'running' && (
@@ -315,35 +360,49 @@ const TeamDashboardPage: React.FC = () => {
                             initial={{opacity: 0, y: 20}}
                             animate={{opacity: 1, y: 0}}
                             exit={{opacity: 0, y: -20}}
-                            className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+                            className="pt-4"
                         >
-                            <div className="lg:col-span-2 space-y-6">
-                                <h2 className="text-3xl font-orbitron text-glow-blue border-b-2 border-[#00eaff]/30 pb-2">Your Clues</h2>
-                                {clues.length > 0 ? (
-                                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                                        {clues.map(clue => {
-                                            const isClueSolved = isSolved(clue.id);
-                                            const status = submitStatus[clue.id] || 'idle';
-                                            return (
-                                                <ClueCard
-                                                    key={clue.id}
-                                                    clue={clue}
-                                                    isSolved={isClueSolved}
-                                                    status={status}
-                                                    currentAnswer={currentAnswer[clue.id]}
-                                                    awardedCoins={awardedCoins[clue.id]}
-                                                    onAnswerChange={handleAnswerChange}
-                                                    onSubmitAnswer={handleSubmitAnswer}
-                                                />
-                                            )
-                                        })}
+                            {activeClueInfo && (
+                                <div className="my-8 text-center p-6 bg-black/40 rounded-lg border-2 border-dashed border-[#ff7b00]/50">
+                                    <h3 className="text-2xl font-orbitron text-gray-400 uppercase tracking-widest">Time on Current Clue</h3>
+                                    <div className="font-orbitron text-7xl font-black tracking-widest text-yellow-300 text-glow mt-2">
+                                        {formatTime(activeClueElapsedTime)}
                                     </div>
-                                ) : (
-                                    <p className="text-gray-400 italic">No clues have been assigned to your domain yet.</p>
-                                )}
-                            </div>
-                            <div className="lg:col-span-1">
-                                <LiveLeaderboard />
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div className="lg:col-span-2 space-y-6">
+                                    <h2 className="text-3xl font-orbitron text-glow-blue border-b-2 border-[#00eaff]/30 pb-2">Your Clues</h2>
+                                    {sortedClues.length > 0 ? (
+                                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                                            {sortedClues.map((clue, index) => {
+                                                const isClueSolved = progressMap.has(clue.id);
+                                                const status = submitStatus[clue.id] || 'idle';
+                                                const isUnlocked = index === 0 || progressMap.has(sortedClues[index - 1].id);
+
+                                                return (
+                                                    <ClueCard
+                                                        key={clue.id}
+                                                        clue={clue}
+                                                        clueNumber={index + 1}
+                                                        isSolved={isClueSolved}
+                                                        status={status}
+                                                        currentAnswer={currentAnswer[clue.id]}
+                                                        awardedCoins={awardedCoins[clue.id]}
+                                                        isActive={isUnlocked}
+                                                        onAnswerChange={handleAnswerChange}
+                                                        onSubmitAnswer={handleSubmitAnswer}
+                                                    />
+                                                )
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-400 italic">No clues have been assigned to your domain yet.</p>
+                                    )}
+                                </div>
+                                <div className="lg:col-span-1">
+                                    <LiveLeaderboard />
+                                </div>
                             </div>
                         </motion.div>
                     )}

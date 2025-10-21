@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 // FIX: Removed HashRouter from imports as it is now handled in index.tsx.
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
@@ -25,9 +23,11 @@ const AnimatedRoutes: React.FC = () => {
         <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/admin-login" element={user ? <Navigate to="/admin-dashboard" /> : <AdminLoginPage />} />
-                <Route path="/team-login" element={user ? <Navigate to="/team-dashboard" /> : <TeamLoginPage />} />
                 
+                {/* FIX: Corrected login page routes to redirect authenticated users to their specific dashboard, preventing incorrect navigation flows. */}
+                <Route path="/admin-login" element={user ? <Navigate to={isAdmin ? '/admin-dashboard' : '/team-dashboard'} replace /> : <AdminLoginPage />} />
+                <Route path="/team-login" element={user ? <Navigate to={isAdmin ? '/admin-dashboard' : '/team-dashboard'} replace /> : <TeamLoginPage />} />
+
                 <Route 
                     path="/admin-dashboard" 
                     element={

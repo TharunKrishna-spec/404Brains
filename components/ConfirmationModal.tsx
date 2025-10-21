@@ -11,6 +11,7 @@ interface ConfirmationModalProps {
   confirmText?: string;
   cancelText?: string;
   isConfirming?: boolean;
+  confirmButtonClassName?: string;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -22,6 +23,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   isConfirming = false,
+  confirmButtonClassName,
 }) => {
   return (
     <AnimatePresence>
@@ -52,7 +54,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               </button>
               <GlowingButton
                 onClick={onConfirm}
-                className="!py-2 !px-6 !border-red-500 group-hover:!bg-red-500"
+                className={confirmButtonClassName || '!py-2 !px-6 !border-red-500 group-hover:!bg-red-500'}
                 loading={isConfirming}
               >
                 {confirmText}

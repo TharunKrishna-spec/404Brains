@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 
@@ -38,7 +39,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
       exit="out"
       variants={pageVariants}
       transition={pageTransition}
-      className="w-full"
+      className="w-full flex-1 flex flex-col"
     >
       {children}
     </motion.div>
