@@ -65,10 +65,10 @@ const LiveLeaderboard: React.FC = () => {
         });
 
         boardData.sort((a, b) => {
-            // 1. Descending by clues solved
-            if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
-            // 2. Descending by coins
+            // 1. Descending by coins
             if (b.coins !== a.coins) return b.coins - a.coins;
+            // 2. Descending by clues solved
+            if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
             // 3. Ascending by last solve time (earlier is better)
             if (a.lastSolveTime && b.lastSolveTime) {
                 const timeA = new Date(a.lastSolveTime).getTime();
@@ -152,7 +152,7 @@ const LiveLeaderboard: React.FC = () => {
                                     <span className="font-bold">{entry.team}</span>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-bold text-lg">{entry.cluesSolved} <span className="text-sm font-normal text-gray-400">clues</span></p>
+                                    <p className="font-bold text-lg">{entry.coins} <span className="font-normal text-sm text-yellow-400">🪙</span></p>
                                 </div>
                             </motion.div>
                         ))}

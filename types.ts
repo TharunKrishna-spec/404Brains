@@ -31,7 +31,7 @@ export interface LeaderboardEntry {
   lastSolveTime: string | null;
 }
 
-// FIX: Added missing Message interface, which is used in the ChatBox component.
+// FIX: Added the missing 'Message' type definition, which is used in ChatBox.tsx.
 export interface Message {
   id: number;
   sender: string;

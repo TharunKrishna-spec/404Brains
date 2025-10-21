@@ -26,33 +26,44 @@ const letterVariants = {
 };
 
 const AnimatedLogo: React.FC = () => {
-  const title = "404: Clue Not Found";
+  const mainTitle = "404";
+  const subtitle = "Clue Not Found";
   const tagline = "VOICE-IT - FEEL THE RHYTHM";
 
   return (
     <div className="text-center">
       {/* Wrapper div for glitch effect on hover */}
-      <div className="glitch-effect" data-text={title}>
+      <div className="glitch-effect" data-text={mainTitle}>
         <motion.h1
-          className="font-orbitron text-5xl md:text-7xl lg:text-8xl font-black text-white uppercase tracking-widest text-glow-blue"
+          className="font-orbitron text-6xl sm:text-7xl md:text-9xl lg:text-[10rem] font-black text-white uppercase tracking-widest text-glow-blue leading-none"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          aria-label={title}
+          aria-label={mainTitle}
         >
-          {title.split("").map((char, index) => (
+          {mainTitle.split("").map((char, index) => (
             <motion.span key={index} variants={letterVariants} className="inline-block">
-              {char === " " ? "\u00A0" : char}
+              {char}
             </motion.span>
           ))}
         </motion.h1>
       </div>
 
+      {/* Subtitle */}
+      <motion.h2
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0, transition: { duration: 0.8, delay: 0.4 } }}
+        className="font-orbitron text-xl sm:text-2xl md:text-4xl font-bold text-white uppercase tracking-[0.2em] text-glow-blue -mt-1 md:-mt-2"
+      >
+        {subtitle}
+      </motion.h2>
+
+
       {/* Re-integrated tagline */}
       <motion.p
         initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0, transition: { duration: 0.8, delay: 0.5 } }}
-        className="font-rajdhani text-lg md:text-xl text-[#ff7b00] uppercase tracking-[0.2em] text-glow mt-4"
+        animate={{ opacity: 1, y: 0, transition: { duration: 0.8, delay: 0.7 } }}
+        className="font-rajdhani text-lg md:text-xl text-[#ff7b00] uppercase tracking-[0.2em] text-glow mt-8"
       >
         {tagline}
       </motion.p>

@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Message } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import SkeletonLoader from './SkeletonLoader';
 import Spinner from './Spinner';
+import { useToast } from './Toast';
 
 interface ChatBoxProps {
     senderName: string;
@@ -15,12 +17,17 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const toast = useToast();
 
     useEffect(() => {
         const fetchMessages = async () => {
             setLoading(true);
             const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-            if (data) setMessages(data as Message[]);
+            if (error) {
+                toast.error(`Failed to load messages: ${error.message}`);
+            } else if (data) {
+                setMessages(data as Message[]);
+            }
             setLoading(false);
         };
         fetchMessages();
@@ -50,7 +57,9 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
         if (newMessage.trim() && !isSending) {
             setIsSending(true);
             const { error } = await supabase.from('messages').insert({ sender: senderName, text: newMessage.trim() });
-            if (!error) {
+            if (error) {
+                toast.error(`Failed to send message: ${error.message}`);
+            } else {
                 setNewMessage('');
             }
             setIsSending(false);
@@ -94,7 +103,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ senderName }) => {
 
                             return (
                                 <motion.div 
-                                    // FIX: Use msg.id as key instead of index for better performance and stability.
                                     key={msg.id} 
                                     className={`flex ${alignment}`}
                                     initial={{ opacity: 0, y: 10 }}

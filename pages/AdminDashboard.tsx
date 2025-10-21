@@ -10,7 +10,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { useToast } from '../components/Toast';
 
-const DOMAINS = ['Cybernetics', 'Quantum', 'Bio-Synth', 'Neutrino'];
+const DOMAINS = ['HealthCare', 'Banking', 'Food', 'Airlines'];
 
 // Icons as React components
 const UsersIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
@@ -23,6 +23,7 @@ const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 10M20 20l-1.5-1.5A9 9 0 013.5 14" />
     </svg>
 );
+
 
 type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard';
 
@@ -48,15 +49,31 @@ const AdminDashboardPage: React.FC = () => {
     const [clues, setClues] = useState<Clue[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const toast = useToast();
 
     const fetchClues = async () => {
         const { data, error } = await supabase.from('clues').select('*').order('id', { ascending: true });
-        if (data) setClues(data);
+        if (error) {
+            toast.error(`Failed to fetch clues: ${error.message}`);
+        } else if (data) {
+            setClues(data);
+        }
     };
 
     const fetchTeams = async () => {
         const { data, error } = await supabase.from('teams').select('*');
-        if (data) setTeams(data);
+        if (error) {
+            toast.error(`Failed to fetch teams: ${error.message}`);
+        } else if (data) {
+            setTeams(data);
+        }
+    };
+    
+    const handleLogout = async () => {
+        const { error } = await logout();
+        if (error) {
+            toast.error(`Logout failed: ${error.message}`);
+        }
     };
 
     useEffect(() => {
@@ -95,7 +112,7 @@ const AdminDashboardPage: React.FC = () => {
             <div className="relative w-full max-w-7xl mx-auto backdrop-blur-sm bg-black/30 p-4 sm:p-8 rounded-2xl border-2 border-[#00eaff]/50">
                 <div className="absolute top-4 right-4 z-20">
                      <GlowingButton 
-                        onClick={logout} 
+                        onClick={handleLogout} 
                         className="!py-2 !px-4 !border-red-500 group-hover:!bg-red-500 !text-sm"
                     >
                         Logout
@@ -112,7 +129,7 @@ const AdminDashboardPage: React.FC = () => {
                             <TabButton tab="view-clues" icon={<ViewIcon className="w-6 h-6"/>} label="View Clues" />
                             <TabButton tab="leaderboard" icon={<LeaderboardIcon className="w-6 h-6"/>} label="Leaderboard" />
                         </aside>
-                        <main className="flex-1 flex flex-col min-h-[60vh] md:min-h-0 bg-black/30 p-6 rounded-lg border border-white/20">
+                        <main className="flex-1 flex flex-col min-h-[60vh] md:min-h-0 bg-black/30 p-4 sm:p-6 rounded-lg border border-white/20">
                             {isLoading ? (
                                 <div className="flex-1 flex items-center justify-center">
                                     <AdminContentSkeleton />
@@ -128,27 +145,82 @@ const AdminDashboardPage: React.FC = () => {
     );
 };
 
+const EventControl: React.FC = () => {
+    const toast = useToast();
+    const [status, setStatus] = useState<'stopped' | 'running'>('stopped');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStatus = async () => {
+            setLoading(true);
+            const { data, error } = await supabase.from('event').select('status').eq('id', 1).single();
+            if (data) setStatus(data.status);
+            if (error) toast.error(`Failed to get event status: ${error.message}`);
+            setLoading(false);
+        };
+        fetchStatus();
+    }, [toast]);
+
+    const handleEventAction = async (action: 'start' | 'stop') => {
+        const newStatus = action === 'start' ? 'running' : 'stopped';
+        const updates: { status: string; start_time?: string } = { status: newStatus };
+        if (action === 'start') {
+            updates.start_time = new Date().toISOString();
+        }
+
+        const { error } = await supabase.from('event').update(updates).eq('id', 1);
+
+        if (error) {
+            toast.error(`Failed to ${action} event: ${error.message}`);
+        } else {
+            toast.success(`Event successfully ${action === 'start' ? 'started' : 'stopped'}!`);
+            setStatus(newStatus);
+        }
+    };
+
+    if (loading) return <SkeletonLoader className="h-24 w-full" />;
+
+    return (
+        <div>
+            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Event Control</h2>
+            <div className="p-4 border border-dashed border-white/20 rounded-lg space-y-4">
+                <p className="text-lg">Current Status: 
+                    <span className={`font-bold ml-2 ${status === 'running' ? 'text-green-400' : 'text-red-400'}`}>
+                        {status.toUpperCase()}
+                    </span>
+                </p>
+                <div className="flex gap-4">
+                    <GlowingButton onClick={() => handleEventAction('start')} disabled={status === 'running'} className="!border-green-500 group-hover:!bg-green-500">
+                        Start Event
+                    </GlowingButton>
+                    <GlowingButton onClick={() => handleEventAction('stop')} disabled={status === 'stopped'} className="!border-red-500 group-hover:!bg-red-500">
+                        Stop Event
+                    </GlowingButton>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded }) => {
     const [newTeamName, setNewTeamName] = useState('');
     const [newTeamEmail, setNewTeamEmail] = useState('');
     const [newTeamPassword, setNewTeamPassword] = useState('');
     const [newTeamDomain, setNewTeamDomain] = useState(DOMAINS[0]);
-    const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const toast = useToast();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTeamName.trim() || !newTeamEmail.trim() || !newTeamPassword.trim()) {
-            setError('All fields are required.');
+            toast.error('All fields are required.');
             return;
         }
         setLoading(true);
-        setError(null);
 
-        const { data: { session: adminSession } } = await supabase.auth.getSession();
-        if (!adminSession) {
-            setError('Admin session not found. Please log in again.');
+        const { data: { session: adminSession }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !adminSession) {
+            toast.error(`Admin session error: ${sessionError?.message || 'Please log in again.'}`);
             setLoading(false);
             return;
         }
@@ -164,7 +236,7 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
         });
 
         if (authError || !signUpData.user) {
-            setError(authError?.message || 'Failed to create user.');
+            toast.error(authError?.message || 'Failed to create user account.');
             setLoading(false);
             return;
         }
@@ -178,11 +250,10 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
 
         if (teamError) {
              if (teamError.code === '42501' || teamError.message?.includes('permission denied')) {
-                setError('Database Permission Denied. Please check RLS policies for the "teams" table to ensure INSERT permission is granted for authenticated users.');
+                toast.error('Database Permission Denied. Check RLS policies for "teams" table.');
             } else {
-                setError(teamError.message);
+                toast.error(`Failed to create team profile: ${teamError.message}`);
             }
-            toast.error(`Failed to add team profile: ${teamError.message}`);
             alert(`CRITICAL ERROR: The team's login was created, but their team profile failed: ${teamError.message}. You must now go to the Supabase 'Authentication' page and manually delete the user '${newTeamEmail}' before trying again.`);
         } else {
             toast.success(`Team "${newTeamName.trim()}" added successfully!`);
@@ -208,7 +279,6 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
                 <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={loading}>
                     Add Team
                 </ GlowingButton>
-                {error && <p className="text-red-400 text-sm mt-2" role="alert">{error}</p>}
             </form>
         </div>
     );
@@ -218,10 +288,8 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
-    const [editError, setEditError] = useState<string | null>(null);
     const [deletingTeamId, setDeletingTeamId] = useState<number | null>(null);
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
-    const [deleteError, setDeleteError] = useState<string | null>(null);
     const toast = useToast();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -240,19 +308,16 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
 
     const openDeleteConfirm = (team: Team) => {
         setTeamToDelete(team);
-        setDeleteError(null);
     };
 
     const closeDeleteConfirm = () => {
         setTeamToDelete(null);
-        setDeleteError(null);
     };
 
     const handleDeleteTeam = async () => {
         if (!teamToDelete) return;
 
         setDeletingTeamId(teamToDelete.id);
-        setDeleteError(null);
         try {
             // 1. Delete team progress first
             const { error: progressError } = await supabase
@@ -270,45 +335,46 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
 
             if (teamError) throw teamError;
             
-            // REMOVED: The call to the 'delete-user' Edge Function which was causing the error.
-            // This restores the previous working behavior.
+            // 3. Delete the auth user via Edge Function to prevent orphans
+            const { error: functionError } = await supabase.functions.invoke('delete-user', {
+                body: { user_id: teamToDelete.user_id },
+            });
+            // Handle function-specific errors (e.g., user not found) gracefully
+            if (functionError && !functionError.message.includes('User not found')) {
+                throw new Error(functionError.message);
+            }
             
-            toast.success(`Team "${teamToDelete.name}" deleted successfully.`);
+            toast.success(`Team "${teamToDelete.name}" and their login credentials have been deleted.`);
             onTeamsChanged();
-            closeDeleteConfirm(); // Close modal on success
+            closeDeleteConfirm();
 
         } catch (e: any) {
-             if (e.code === '42501' || e.message?.includes('permission denied')) {
-                setDeleteError(`Database Permission Denied. Check RLS policies for 'teams' and 'team_progress' tables.`);
-            } else {
-                setDeleteError(`An error occurred: ${e.message}`);
-            }
+             const errorMessage = e.message?.includes('permission denied')
+                ? `Database Permission Denied. Check RLS policies.`
+                : e.message ? `An error occurred: ${e.message}` : 'An unknown error occurred during team deletion.';
+            toast.error(errorMessage);
             console.error(e);
         } finally {
             setDeletingTeamId(null);
-            // On error, we don't close the modal so the user can see the error message.
         }
     };
 
     const handleOpenEditModal = (team: Team) => {
         setEditingTeam({ ...team });
-        setEditError(null);
         setIsEditModalOpen(true);
     };
 
     const handleCancelEdit = () => {
         setIsEditModalOpen(false);
         setEditingTeam(null);
-        setEditError(null);
     };
 
     const handleUpdateTeam = async () => {
         if (!editingTeam || !editingTeam.name.trim()) {
-            setEditError('Team name cannot be empty.');
+            toast.error('Team name cannot be empty.');
             return;
         }
         setIsUpdating(true);
-        setEditError(null);
 
         const { error } = await supabase.from('teams').update({
             name: editingTeam.name.trim(),
@@ -317,9 +383,9 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
 
         if (error) {
             if (error.code === '42501' || error.message?.includes('permission denied')) {
-                setEditError('Database Permission Denied. Please check the RLS policies for the "teams" table to ensure admins have UPDATE permission.');
+                toast.error('Permission Denied. Check RLS policies for the "teams" table.');
             } else {
-                setEditError('Failed to update team: ' + error.message);
+                toast.error('Failed to update team: ' + error.message);
             }
         } else {
             toast.success(`Team "${editingTeam.name.trim()}" updated successfully.`);
@@ -344,12 +410,12 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
             </div>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 {teams.map(team => (
-                    <div key={team.id} className="p-4 bg-white/5 rounded-lg flex justify-between items-center">
+                    <div key={team.id} className="p-4 bg-white/5 rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                         <div>
                             <p className="font-bold text-lg">{team.name}</p>
                             <p className="text-sm text-gray-400">Coins: {team.coins} | Domain: <span className="font-semibold text-gray-300">{team.domain}</span></p>
                         </div>
-                        <div className="flex space-x-4">
+                        <div className="flex space-x-4 self-end sm:self-auto">
                             <button onClick={() => handleOpenEditModal(team)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
                             <button 
                                 onClick={() => openDeleteConfirm(team)} 
@@ -369,19 +435,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
                 message={
                     <>
                         <p>Are you sure you want to permanently delete team <strong className="font-bold text-white">{teamToDelete?.name}</strong>?</p>
-                        <p className="mt-2 text-sm text-yellow-400">This action will delete the team's profile and all their progress. Note: This does <strong className="font-semibold text-red-400">NOT</strong> delete their login credentials.</p>
-                        <AnimatePresence>
-                        {deleteError && (
-                            <motion.div 
-                                initial={{height: 0, opacity: 0, marginTop: 0}}
-                                animate={{height: 'auto', opacity: 1, marginTop: '1rem'}}
-                                exit={{height: 0, opacity: 0, marginTop: 0}}
-                                className="p-3 bg-red-900/50 border border-red-500/80 rounded-md"
-                            >
-                                <p className="text-red-300 font-bold text-sm" role="alert">{deleteError}</p>
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
+                        <p className="mt-2 text-sm text-yellow-400">This action will delete the team's profile, all their progress, and <strong className="font-semibold text-red-400">their login credentials</strong>. This cannot be undone.</p>
                     </>
                 }
                 confirmText="Delete Team"
@@ -400,35 +454,22 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            className="relative w-full max-w-lg bg-black border-2 border-[#00eaff] rounded-lg p-6 space-y-4"
+                            className="relative w-full max-w-lg bg-black border-2 border-[#00eaff] rounded-lg p-4 sm:p-6 space-y-4"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <h3 className="text-2xl font-orbitron text-glow-blue">Edit Team: {editingTeam.name}</h3>
                             <div className="space-y-3">
                                 <label className="block text-sm font-bold text-gray-400">Team Name</label>
-                                <input type="text" value={editingTeam.name} onChange={(e) => {
-                                    setEditingTeam({ ...editingTeam, name: e.target.value });
-                                    if (editError) setEditError(null);
-                                }} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Team name"/>
+                                <input type="text" value={editingTeam.name} onChange={(e) => setEditingTeam({ ...editingTeam, name: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Team name"/>
                                 
                                 <label className="block text-sm font-bold text-gray-400">Domain</label>
-                                <select value={editingTeam.domain} onChange={(e) => {
-                                    setEditingTeam({ ...editingTeam, domain: e.target.value });
-                                    if (editError) setEditError(null);
-                                }} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
-                                    {DOMAINS.map(d => <option key={d} value={d} className="bg-black">{d}</option>)}
+                                <select value={editingTeam.domain} onChange={(e) => setEditingTeam({ ...editingTeam, domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
+                                    {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                                 </select>
                             </div>
-                            <AnimatePresence>
-                                {editError && (
-                                    <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="text-red-400 text-center text-sm font-bold pt-2" role="alert">
-                                        {editError}
-                                    </motion.p>
-                                )}
-                            </AnimatePresence>
-                            <div className="flex space-x-4 justify-end pt-4">
-                                <button onClick={handleCancelEdit} className="px-4 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
-                                <GlowingButton onClick={handleUpdateTeam} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
+                            <div className="flex justify-end space-x-4 pt-4">
+                                <button onClick={handleCancelEdit} className="px-6 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
+                                <GlowingButton onClick={handleUpdateTeam} className="!py-2 !px-6 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
                                     Save Changes
                                 </GlowingButton>
                             </div>
@@ -444,335 +485,144 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
     const [newClueText, setNewClueText] = useState('');
     const [newClueAnswer, setNewClueAnswer] = useState('');
     const [newClueDomain, setNewClueDomain] = useState(DOMAINS[0]);
-    const [newClueImageFile, setNewClueImageFile] = useState<File | null>(null);
-    const [newClueImagePreview, setNewClueImagePreview] = useState<string | null>(null);
-    const [isAdding, setIsAdding] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [newClueImageUrl, setNewClueImageUrl] = useState('');
+    const [loading, setLoading] = useState(false);
     const toast = useToast();
-    
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) { // 2MB limit
-                setError('File size should not exceed 2MB.');
-                return;
-            }
-            setError(null);
-            setNewClueImageFile(file);
-            setNewClueImagePreview(URL.createObjectURL(file));
-        } else {
-            setNewClueImageFile(null);
-            setNewClueImagePreview(null);
-        }
-    };
-    
-    const uploadImage = async (file: File): Promise<string | null> => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${uuidv4()}.${fileExt}`;
-        const { error } = await supabase.storage
-            .from('clue-images')
-            .upload(fileName, file);
 
-        if (error) {
-            setError('Error uploading image: ' + error.message);
-            return null;
-        }
-
-        const { data } = supabase.storage
-            .from('clue-images')
-            .getPublicUrl(fileName);
-        
-        return data.publicUrl;
-    };
-
-    const handleAddClue = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newClueText.trim() || !newClueAnswer.trim()) {
-            setError('Clue text and answer are required.');
+            toast.error('Clue text and answer are required.');
             return;
         }
-        setIsAdding(true);
-        setError(null);
+        setLoading(true);
 
-        let imageUrl: string | undefined = undefined;
-        if (newClueImageFile) {
-            const uploadedUrl = await uploadImage(newClueImageFile);
-            if (!uploadedUrl) {
-                setIsAdding(false);
-                return; // Stop if upload fails
-            }
-            imageUrl = uploadedUrl;
-        }
-
-        const { error: insertError } = await supabase.from('clues').insert({
+        const { error } = await supabase.from('clues').insert({
             text: newClueText.trim(),
             answer: newClueAnswer.trim().toUpperCase(),
-            image_url: imageUrl,
             domain: newClueDomain,
+            image_url: newClueImageUrl.trim() || undefined,
         });
 
-        if (insertError) {
-            if (insertError.code === '42501' || insertError.message?.includes('permission denied')) {
-                setError('Database Permission Denied: Could not add clue. Please check the RLS policies for the "clues" table to ensure INSERT permission is granted.');
-            } else {
-                setError('Failed to add clue: ' + insertError.message);
-            }
+        if (error) {
+            toast.error(`Failed to add clue: ${error.message}`);
         } else {
             toast.success('Clue added successfully!');
+            onClueAdded();
             setNewClueText('');
             setNewClueAnswer('');
             setNewClueDomain(DOMAINS[0]);
-            setNewClueImageFile(null);
-            setNewClueImagePreview(null);
-            onClueAdded();
+            setNewClueImageUrl('');
         }
-        setIsAdding(false);
+        setLoading(false);
     };
 
     return (
         <div>
-            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Add Clue</h2>
-             <form 
-                onSubmit={handleAddClue} 
-                className="p-4 border border-dashed border-white/20 rounded-lg space-y-3"
-            >
+            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Add New Clue</h2>
+            <form onSubmit={handleSubmit} className="p-4 border border-dashed border-white/20 rounded-lg space-y-3">
+                <textarea value={newClueText} onChange={(e) => setNewClueText(e.target.value)} placeholder="New clue text..." rows={3} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
+                <input type="text" value={newClueAnswer} onChange={(e) => setNewClueAnswer(e.target.value)} placeholder="Clue answer (case-insensitive)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
+                <input type="url" value={newClueImageUrl} onChange={(e) => setNewClueImageUrl(e.target.value)} placeholder="Image URL (optional)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <select value={newClueDomain} onChange={(e) => setNewClueDomain(e.target.value)} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500">
                     {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                 </select>
-                <input type="text" value={newClueText} onChange={(e) => setNewClueText(e.target.value)} placeholder="Clue text..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
-                <input type="text" value={newClueAnswer} onChange={(e) => setNewClueAnswer(e.target.value)} placeholder="Clue answer (will be stored as uppercase)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
-                <div className="mt-2">
-                    <label className="text-sm text-gray-400">Optional Image (Max 2MB)</label>
-                    <input type="file" accept="image/*" onChange={handleFileChange} className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#00eaff]/20 file:text-[#00eaff] hover:file:bg-[#00eaff]/30"/>
-                </div>
-                {newClueImagePreview && (
-                    <div className="mt-2 relative w-32">
-                        <img src={newClueImagePreview} alt="Clue preview" className="rounded-md w-full h-auto" />
-                        <button type="button" onClick={() => { setNewClueImageFile(null); setNewClueImagePreview(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold image-delete-button">&times;</button>
-                    </div>
-                )}
-                <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isAdding}>
+                <GlowingButton type="submit" className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={loading}>
                     Add Clue
-                </GlowingButton>
-                {error && <p className="text-red-400 text-sm mt-2" role="alert">{error}</p>}
+                </ GlowingButton>
             </form>
         </div>
     );
 };
 
-const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => Promise<void> }> = ({ clues, onCluesChanged }) => {
-    const [editingClue, setEditingClue] = useState<{ clue: Clue; index: number } | null>(null);
-    const [editingClueImageFile, setEditingClueImageFile] = useState<File | null>(null);
+const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void }> = ({ clues, onCluesChanged }) => {
+    const toast = useToast();
+    const [editingClue, setEditingClue] = useState<Clue | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
-    const [editError, setEditError] = useState<string | null>(null);
     const [clueToDelete, setClueToDelete] = useState<Clue | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const toast = useToast();
-    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const handleRefresh = async () => {
-        if (isRefreshing) return;
-        setIsRefreshing(true);
-        try {
-            await onCluesChanged();
-            toast.info("Clue list has been refreshed.");
-        } catch (e) {
-            toast.error("Failed to refresh clue list.");
-        } finally {
-            setIsRefreshing(false);
-        }
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) { // 2MB limit
-                setEditError('File size should not exceed 2MB.');
-                return;
-            }
-            setEditError(null);
-            setEditingClueImageFile(file);
-        } else {
-            setEditingClueImageFile(null);
-        }
-    };
-    
-    const uploadImage = async (file: File): Promise<string | null> => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${uuidv4()}.${fileExt}`;
-        const { error } = await supabase.storage
-            .from('clue-images')
-            .upload(fileName, file);
-
-        if (error) {
-            setEditError('Error uploading image: ' + error.message);
-            return null;
-        }
-
-        const { data } = supabase.storage
-            .from('clue-images')
-            .getPublicUrl(fileName);
-        
-        return data.publicUrl;
-    };
-    
     const openDeleteConfirm = (clue: Clue) => {
         setClueToDelete(clue);
     };
 
-    const closeDeleteConfirm = () => {
-        setClueToDelete(null);
-    };
-
     const handleDeleteClue = async () => {
         if (!clueToDelete) return;
-        setIsDeleting(true);
-
-        if (clueToDelete.image_url) {
-            try {
-                const fileName = clueToDelete.image_url.split('/').pop();
-                if (fileName) {
-                    await supabase.storage.from('clue-images').remove([fileName]);
-                }
-            } catch (storageError) {
-                console.error("Could not delete image from storage, but proceeding with DB deletion:", storageError);
-            }
-        }
-
         const { error } = await supabase.from('clues').delete().eq('id', clueToDelete.id);
         if (error) {
-                if (error.code === '42501' || error.message?.includes('permission denied')) {
-                toast.error('Database Permission Denied: Could not delete clue.');
-            } else {
-                toast.error('Failed to delete clue: ' + error.message);
-            }
+            toast.error(`Failed to delete clue: ${error.message}`);
         } else {
-            toast.success(`Clue deleted successfully.`);
+            toast.success(`Clue for domain "${clueToDelete.domain}" deleted.`);
             onCluesChanged();
         }
-        setIsDeleting(false);
-        closeDeleteConfirm();
+        setClueToDelete(null); // Close modal
     };
     
-    const handleOpenEditModal = (clue: Clue, index: number) => {
-        setEditingClue({ clue: { ...clue }, index });
-        setEditingClueImageFile(null);
-        setEditError(null);
+    const handleOpenEditModal = (clue: Clue) => {
+        setEditingClue({ ...clue });
         setIsEditModalOpen(true);
     };
 
     const handleCancelEdit = () => {
         setIsEditModalOpen(false);
         setEditingClue(null);
-        setEditingClueImageFile(null);
-        setEditError(null);
     };
-    
+
     const handleUpdateClue = async () => {
-        if (!editingClue || !editingClue.clue.text.trim() || !editingClue.clue.answer.trim()) {
-            setEditError('Clue text and answer cannot be empty.');
+        if (!editingClue || !editingClue.text.trim() || !editingClue.answer.trim()) {
+            toast.error('Clue text and answer cannot be empty.');
             return;
         }
         setIsUpdating(true);
-        setEditError(null);
-
-        let imageUrl = editingClue.clue.image_url;
-        if (editingClueImageFile) {
-            const uploadedUrl = await uploadImage(editingClueImageFile);
-            if (!uploadedUrl) {
-                setIsUpdating(false);
-                return;
-            }
-            imageUrl = uploadedUrl;
-        }
 
         const { error } = await supabase.from('clues').update({
-            text: editingClue.clue.text.trim(),
-            answer: editingClue.clue.answer.trim().toUpperCase(),
-            image_url: imageUrl,
-            domain: editingClue.clue.domain,
-        }).eq('id', editingClue.clue.id).select();
+            text: editingClue.text.trim(),
+            answer: editingClue.answer.trim().toUpperCase(),
+            domain: editingClue.domain,
+            image_url: editingClue.image_url?.trim() || null
+        }).eq('id', editingClue.id);
 
         if (error) {
-             if (error.code === '42501' || error.message?.includes('permission denied')) {
-                setEditError('Database Permission Denied: Please check RLS policies for the "clues" table to ensure UPDATE permission is granted.');
-            } else {
-                setEditError('Failed to update clue: ' + error.message);
-            }
+            toast.error('Failed to update clue: ' + error.message);
         } else {
-            toast.success(`Clue #${editingClue.index + 1} in ${editingClue.clue.domain} updated successfully.`);
+            toast.success('Clue updated successfully.');
             onCluesChanged();
             handleCancelEdit();
         }
         setIsUpdating(false);
     };
 
-    const cluesByDomain = clues.reduce((acc, clue) => {
-        const domain = clue.domain || 'Uncategorized';
-        if (!acc[domain]) {
-            acc[domain] = [];
-        }
-        acc[domain].push(clue);
-        return acc;
-    }, {} as Record<string, Clue[]>);
 
     return (
-         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-orbitron text-[#00eaff]">View & Edit Clues</h2>
-                <button
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
-                    aria-label="Refresh clues list"
-                >
-                    <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
-            </div>
-            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-                {DOMAINS.map(domain => {
-                    const domainClues = cluesByDomain[domain] || [];
-                    return (
-                        <div key={domain}>
-                            <h4 className="text-2xl font-orbitron text-gray-400 border-b-2 border-gray-700 pb-2 mb-4">{domain} ({domainClues.length} clues)</h4>
-                            {domainClues.length > 0 ? (
-                                <div className="space-y-4">
-                                {domainClues.map((clue, index) => (
-                                    <div key={clue.id} className="p-4 bg-white/5 rounded-lg">
-                                        <p className="font-semibold text-lg">Clue #{index + 1}: <span className="font-light text-gray-300">"{clue.text}"</span></p>
-                                        <p className="font-semibold text-md mt-1">Answer: <span className="font-mono text-green-400 bg-black/30 px-2 py-1 rounded">{clue.answer}</span></p>
-                                        {clue.image_url && (
-                                            <div className="mt-2">
-                                                <img src={clue.image_url} alt={`Clue image`} className="max-w-xs max-h-32 rounded-md" />
-                                            </div>
-                                        )}
-                                        <div className="flex space-x-4 mt-2">
-                                            <button onClick={() => handleOpenEditModal(clue, index)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
-                                            <button onClick={() => openDeleteConfirm(clue)} className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors">Delete</button>
-                                        </div>
-                                    </div>
-                                ))}
-                                </div>
-                            ) : (
-                                <p className="text-gray-500 italic">No clues added for this domain yet.</p>
-                            )}
+        <div>
+            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">View & Edit Clues</h2>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                {clues.length > 0 ? clues.map(clue => (
+                    <div key={clue.id} className="p-4 bg-white/5 rounded-lg flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                            <p className="font-bold text-lg">{clue.text}</p>
+                            <p className="text-sm text-green-400 font-mono">Answer: {clue.answer}</p>
+                            <p className="text-sm text-gray-400">Domain: <span className="font-semibold text-gray-300">{clue.domain}</span></p>
+                            {clue.image_url && <p className="text-xs text-gray-500 truncate">Image: {clue.image_url}</p>}
                         </div>
-                    )
-                })}
+                        <div className="flex flex-col space-y-2 items-end">
+                            <button onClick={() => handleOpenEditModal(clue)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
+                            <button onClick={() => openDeleteConfirm(clue)} className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors">Delete</button>
+                        </div>
+                    </div>
+                )) : (
+                    <p className="text-gray-400 italic">No clues found. Use the "Add Clues" tab to create some.</p>
+                )}
             </div>
-
             <ConfirmationModal
                 isOpen={!!clueToDelete}
-                onClose={closeDeleteConfirm}
+                onClose={() => setClueToDelete(null)}
                 onConfirm={handleDeleteClue}
                 title="Confirm Clue Deletion"
-                message={<p>Are you sure you want to permanently delete the clue: <strong className="font-bold text-white">"{clueToDelete?.text}"</strong>? This action cannot be undone.</p>}
-                isConfirming={isDeleting}
+                message={<>Are you sure you want to permanently delete this clue? <br /><strong className="font-mono text-white mt-2 block">"{clueToDelete?.text}"</strong></>}
+                confirmText="Delete Clue"
             />
-
-            {/* Edit Clue Modal */}
-            <AnimatePresence>
+             <AnimatePresence>
                 {isEditModalOpen && editingClue && (
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -785,45 +635,28 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => Promi
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            className="relative w-full max-w-lg bg-black border-2 border-[#00eaff] rounded-lg p-6 space-y-4"
+                            className="relative w-full max-w-2xl bg-black border-2 border-[#00eaff] rounded-lg p-4 sm:p-6 space-y-4"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit {editingClue.clue.domain} Clue #{editingClue.index + 1}</h3>
+                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit Clue #{editingClue.id}</h3>
                             <div className="space-y-3">
-                                <label className="block text-sm font-bold text-gray-400">Domain</label>
-                                <select value={editingClue.clue.domain} onChange={(e) => setEditingClue({ ...editingClue, clue: { ...editingClue.clue, domain: e.target.value } })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
-                                    {DOMAINS.map(d => <option key={d} value={d} className="bg-black">{d}</option>)}
-                                </select>
-                                
                                 <label className="block text-sm font-bold text-gray-400">Clue Text</label>
-                                <textarea value={editingClue.clue.text} onChange={(e) => setEditingClue({ ...editingClue, clue: { ...editingClue.clue, text: e.target.value } })} className="w-full h-24 px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue text"/>
+                                <textarea value={editingClue.text} onChange={(e) => setEditingClue({ ...editingClue, text: e.target.value })} rows={3} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue text"/>
                                 
                                 <label className="block text-sm font-bold text-gray-400">Answer</label>
-                                <input type="text" value={editingClue.clue.answer} onChange={(e) => setEditingClue({ ...editingClue, clue: { ...editingClue.clue, answer: e.target.value } })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue answer"/>
-                                
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-400">Clue Image (Optional)</label>
-                                    <div className="flex items-center gap-4 mt-2">
-                                        {(editingClue.clue.image_url || editingClueImageFile) && (
-                                            <div className="relative w-24 h-24">
-                                                <img src={editingClueImageFile ? URL.createObjectURL(editingClueImageFile) : editingClue.clue.image_url} alt="Current clue" className="rounded-md w-full h-full object-cover" />
-                                                <button type="button" onClick={() => { setEditingClue({ ...editingClue, clue: { ...editingClue.clue, image_url: undefined } }); setEditingClueImageFile(null); }} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold image-delete-button">&times;</button>
-                                            </div>
-                                        )}
-                                        <input type="file" accept="image/*" onChange={handleFileChange} className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#00eaff]/20 file:text-[#00eaff] hover:file:bg-[#00eaff]/30"/>
-                                    </div>
-                                </div>
+                                <input type="text" value={editingClue.answer} onChange={(e) => setEditingClue({ ...editingClue, answer: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue answer"/>
+
+                                <label className="block text-sm font-bold text-gray-400">Image URL (Optional)</label>
+                                <input type="url" value={editingClue.image_url || ''} onChange={(e) => setEditingClue({ ...editingClue, image_url: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="https://..."/>
+
+                                <label className="block text-sm font-bold text-gray-400">Domain</label>
+                                <select value={editingClue.domain} onChange={(e) => setEditingClue({ ...editingClue, domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
+                                    {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
+                                </select>
                             </div>
-                             <AnimatePresence>
-                                {editError && (
-                                    <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="text-red-400 text-center text-sm font-bold pt-2" role="alert">
-                                        {editError}
-                                    </motion.p>
-                                )}
-                            </AnimatePresence>
-                            <div className="flex space-x-4 justify-end pt-4">
-                                <button onClick={handleCancelEdit} className="px-4 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
-                                <GlowingButton onClick={handleUpdateClue} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
+                            <div className="flex justify-end space-x-4 pt-4">
+                                <button onClick={handleCancelEdit} className="px-6 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
+                                <GlowingButton onClick={handleUpdateClue} className="!py-2 !px-6 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
                                     Save Changes
                                 </GlowingButton>
                             </div>
@@ -835,204 +668,16 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => Promi
     );
 };
 
-const EventControl: React.FC = () => {
-    const [status, setStatus] = useState<'stopped' | 'running'>('stopped');
-    const [isStartConfirmOpen, setIsStartConfirmOpen] = useState(false);
-    const [isStartingEvent, setIsStartingEvent] = useState(false);
-    const toast = useToast();
-
-    useEffect(() => {
-        const fetchEvent = async () => {
-            const { data } = await supabase.from('event').select('status').eq('id', 1).single();
-            if (data) {
-                setStatus(data.status);
-            }
-        };
-        fetchEvent();
-        const channel = supabase.channel('public:event')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchEvent)
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    // console.log('Subscribed to event updates');
-                }
-            });
-        return () => { supabase.removeChannel(channel); };
-    }, []);
-    
-    const confirmStartEvent = async () => {
-        setIsStartingEvent(true);
-        try {
-            // Step 1: Delete all progress records
-            const { error: progressError } = await supabase.from('team_progress').delete().gt('team_id', 0);
-            if (progressError) throw progressError;
-    
-            // Step 2: Reset all team coins to 0
-            const { error: teamsError } = await supabase.from('teams').update({ coins: 0 }).gt('id', 0);
-            if (teamsError) throw teamsError;
-    
-            // Step 3: Start the event
-            const { error: eventError } = await supabase.from('event').update({ status: 'running', start_time: new Date().toISOString() }).eq('id', 1);
-            if (eventError) throw eventError;
-    
-            toast.success("Event started! All team progress has been reset.");
-            setIsStartConfirmOpen(false);
-        } catch (e: any) {
-            const errorMessage = e.message?.includes('permission denied') 
-                ? 'Database Permission Denied. Please check Supabase RLS policies.'
-                : e.message;
-            toast.error(`Failed to start event: ${errorMessage}`);
-            console.error(e);
-        } finally {
-            setIsStartingEvent(false);
-        }
-    }
-
-    const handleStart = () => {
-        if (status === 'stopped') {
-            setIsStartConfirmOpen(true);
-        }
-    };
-    
-    const handleStop = async () => {
-        if (status === 'running') {
-            if (window.confirm('Are you sure you want to stop the event? This will pause the game for all teams.')) {
-                 await supabase.from('event').update({ status: 'stopped', start_time: null }).eq('id', 1);
-            }
-        }
-    };
-
-    return (
-        <div>
-            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Event Control</h2>
-            <div className="text-center p-8 bg-black/40 rounded-lg border border-dashed border-white/20">
-                <p className="text-xl mb-4 font-bold">Event Status</p>
-                <div className={`font-orbitron text-5xl font-black tracking-widest ${status === 'running' ? 'text-green-400 text-glow-green' : 'text-red-500'}`}>
-                    {status === 'running' ? 'LIVE' : 'STOPPED'}
-                </div>
-            </div>
-            <div className="flex justify-center space-x-6 mt-8">
-                <GlowingButton onClick={handleStart} className={`!border-green-500 group-hover:!bg-green-500 ${status === 'running' ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={status === 'running'}>
-                    {status === 'running' ? 'Running...' : 'Start Event'}
-                </GlowingButton>
-                <GlowingButton onClick={handleStop} className={`!border-red-500 group-hover:!bg-red-500 ${status !== 'running' ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={status !== 'running'}>
-                    {status === 'running' ? 'Stop Event' : 'Event Stopped'}
-                </GlowingButton>
-            </div>
-             <ConfirmationModal
-                isOpen={isStartConfirmOpen}
-                onClose={() => setIsStartConfirmOpen(false)}
-                onConfirm={confirmStartEvent}
-                title="Confirm Event Start"
-                message={
-                    <div className="space-y-2">
-                        <p>Starting the event will <strong className="font-bold text-yellow-300">reset all team progress and scores to zero.</strong></p>
-                        <p className="text-gray-400">This action cannot be undone. Are you sure you want to proceed?</p>
-                    </div>
-                }
-                confirmText="Start & Reset"
-                confirmButtonClassName="!py-2 !px-6 !border-green-500 group-hover:!bg-green-500"
-                isConfirming={isStartingEvent}
-            />
-        </div>
-    );
-};
-
-
 const LeaderboardView: React.FC = () => {
-    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchLeaderboard = async () => {
-            setLoading(true);
-            const { data: teams, error: teamsError } = await supabase.from('teams').select('*');
-            if (teamsError) {
-                setLoading(false);
-                return;
-            }
-
-            const { data: progress, error: progressError } = await supabase.from('team_progress').select('*');
-            if (progressError) {
-                setLoading(false);
-                return;
-            }
-
-            const board = teams.map(team => {
-                const solved = progress.filter(p => p.team_id === team.id);
-                const lastSolve = solved.length > 0 ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) : null;
-                return {
-                    id: team.id,
-                    team: team.name,
-                    coins: team.coins,
-                    cluesSolved: solved.length,
-                    lastSolveTime: lastSolve ? lastSolve.solved_at : null
-                };
-            });
-
-            board.sort((a, b) => {
-                // 1. Descending by clues solved
-                if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
-                // 2. Descending by coins
-                if (b.coins !== a.coins) return b.coins - a.coins;
-                // 3. Ascending by last solve time (earlier is better)
-                if (a.lastSolveTime && b.lastSolveTime) {
-                    const timeA = new Date(a.lastSolveTime).getTime();
-                    const timeB = new Date(b.lastSolveTime).getTime();
-                    if (timeA !== timeB) return timeA - timeB;
-                }
-                // 4. Tie-breaker: Ascending by Team ID for consistency
-                return a.id - b.id;
-            });
-            
-            setLeaderboard(board.map((item, index) => ({ ...item, rank: index + 1 })));
-            setLoading(false);
-        };
-
-        fetchLeaderboard();
-        const channel = supabase.channel('admin-leaderboard-updates')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboard)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboard)
-            // FIX: The `subscribe` method requires a callback argument to handle subscription status, which was missing.
-            .subscribe(status => {
-                if (status === 'SUBSCRIBED') {
-                    // console.log('Subscribed to leaderboard updates');
-                }
-            });
-
-        return () => { supabase.removeChannel(channel); };
-    }, []);
-
     return (
         <div>
             <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Leaderboard</h2>
-            {loading ? (
-                <div className="text-center py-8 text-lg font-rajdhani animate-pulse">Fetching latest standings...</div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b border-white/20 text-sm uppercase text-gray-400">
-                            <tr>
-                                <th className="p-3">Rank</th>
-                                <th className="p-3">Team</th>
-                                <th className="p-3">Coins</th>
-                                <th className="p-3">Clues Solved</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {leaderboard.map((entry) => (
-                                <tr key={entry.rank} className="border-b border-white/10 hover:bg-white/5">
-                                    <td className="p-3 font-bold">{entry.rank}</td>
-                                    <td className="p-3 font-bold">{entry.team}</td>
-                                    <td className="p-3">{entry.coins}</td>
-                                    <td className="p-3">{entry.cluesSolved}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <p className="text-gray-400">This tab provides a quick link to the public-facing leaderboard. All real-time tracking can be viewed there.</p>
+            <GlowingButton to="/leaderboard" className="mt-4 !py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]">
+                View Public Leaderboard
+            </GlowingButton>
         </div>
     );
-}
+};
 
 export default AdminDashboardPage;

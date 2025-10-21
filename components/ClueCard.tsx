@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlowingButton from './GlowingButton';
 import { Clue } from '../types';
@@ -21,8 +21,23 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
     
     const isCurrentlyActive = isActive && !isSolved;
     
+    // FIX: Refactored card styling into a memoized variable for better readability and performance.
+    // This provides more distinct visual cues for locked, active, and solved states.
+    const cardStateStyles = useMemo(() => {
+        if (isSolved) {
+            // Solved: Green border, slightly darker background to feel "completed".
+            return 'bg-black/60 border-green-500/70';
+        }
+        if (isCurrentlyActive) {
+            // Active: Bright glowing orange border to draw focus.
+            return 'bg-black/40 border-[#ff7b00] shadow-lg shadow-[#ff7b00]/30';
+        }
+        // Locked: Muted gray border and faded out to de-emphasize.
+        return 'bg-black/40 border-gray-700 opacity-50';
+    }, [isSolved, isCurrentlyActive]);
+    
     return (
-        <div className={`p-4 rounded-lg bg-black/40 border-2 transition-all duration-500 ${!isActive && !isSolved ? 'opacity-60' : ''} ${isSolved ? 'border-green-500/70' : isCurrentlyActive ? 'border-[#ff7b00]/80' : 'border-white/20'}`}>
+        <div className={`p-4 rounded-lg border-2 transition-all duration-500 ${cardStateStyles}`}>
             <div className="flex justify-between items-start">
                 <p className="font-semibold text-xl">Clue #{clueNumber}</p>
                 {isSolved ? (
@@ -33,16 +48,20 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
                     <div className="px-3 py-1 bg-gray-500/30 text-gray-300 font-bold text-sm rounded-full flex items-center gap-2">LOCKED</div>
                 )}
             </div>
-            <p 
-                className="text-gray-300 mt-2 text-lg typing-effect"
-                style={{ '--char-count': clue.text.length } as React.CSSProperties}
-            >
-                {clue.text}
-            </p>
-            {clue.image_url && (
-                <div className="mt-4">
-                    <img src={clue.image_url} alt={`Clue image`} className="max-w-sm rounded-md shadow-lg holographic-image" />
-                </div>
+            {isActive && (
+                <>
+                    <p 
+                        className="text-gray-300 mt-2 text-lg typing-effect"
+                        style={{ '--char-count': clue.text.length } as React.CSSProperties}
+                    >
+                        {clue.text}
+                    </p>
+                    {clue.image_url && (
+                        <div className="mt-4">
+                            <img src={clue.image_url} alt={`Clue image`} className="max-w-sm rounded-md shadow-lg holographic-image" />
+                        </div>
+                    )}
+                </>
             )}
             
             {isCurrentlyActive && (

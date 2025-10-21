@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
@@ -110,30 +111,39 @@ const TeamDashboardPage: React.FC = () => {
                 .eq('user_id', user.id)
                 .single();
             
+            if (teamError) {
+                toast.error(`Could not load team data: ${teamError.message}`);
+                setLoading(false);
+                return; // Stop execution if team data fails
+            }
+            
             if (teamData) {
                 setTeam(teamData);
     
                 // Fetch clues for team's domain
-                const { data: cluesData } = await supabase
+                const { data: cluesData, error: cluesError } = await supabase
                     .from('clues')
                     .select('*')
                     .eq('domain', teamData.domain)
                     .order('id', { ascending: true });
-    
-                if (cluesData) setClues(cluesData);
+                
+                if (cluesError) toast.error(`Failed to load clues: ${cluesError.message}`);
+                else if (cluesData) setClues(cluesData);
     
                 // Fetch team progress
-                const { data: progressData } = await supabase
+                const { data: progressData, error: progressError } = await supabase
                     .from('team_progress')
                     .select('*')
                     .eq('team_id', teamData.id);
-    
-                if (progressData) setProgress(progressData);
+                
+                if (progressError) toast.error(`Failed to load progress: ${progressError.message}`);
+                else if (progressData) setProgress(progressData);
             }
             
             // Fetch event status and start time
-            const { data: eventData } = await supabase.from('event').select('status, start_time').eq('id', 1).single();
-            if (eventData) {
+            const { data: eventData, error: eventError } = await supabase.from('event').select('status, start_time').eq('id', 1).single();
+            if (eventError) toast.error(`Failed to get event status: ${eventError.message}`);
+            else if (eventData) {
                 setEventStatus(eventData.status);
                 setStartTime(eventData.start_time);
             }
@@ -147,7 +157,6 @@ const TeamDashboardPage: React.FC = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchTeamData)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchTeamData)
-            // FIX: The `subscribe` method requires a callback argument. Added a callback to resolve the "Expected 1 arguments, but got 0" error.
             .subscribe(status => {
                 if (status === 'SUBSCRIBED') {
                     // console.log(`Subscribed to team dashboard updates for user ${user?.id}`);
@@ -212,6 +221,12 @@ const TeamDashboardPage: React.FC = () => {
         }
     }, [eventStatus]);
 
+    const handleLogout = async () => {
+        const { error } = await logout();
+        if (error) {
+            toast.error(`Logout failed: ${error.message}`);
+        }
+    };
 
     const handleAnswerChange = (clueId: number, value: string) => {
         setCurrentAnswer(prev => ({ ...prev, [clueId]: value }));
@@ -258,7 +273,6 @@ const TeamDashboardPage: React.FC = () => {
                 const { error: teamUpdateError } = await supabase.from('teams').update({ coins: newCoins }).eq('id', team.id);
                 if (teamUpdateError) throw teamUpdateError;
 
-                // FIX: Force immediate local state update to reset timer without waiting for realtime broadcast.
                 const newProgressRecord: TeamProgress = { team_id: team.id, clue_id: clueId, solved_at: solveTime.toISOString() };
                 setProgress(prev => [...prev, newProgressRecord]);
                 setTeam(prev => prev ? { ...prev, coins: newCoins } : null);
@@ -272,7 +286,6 @@ const TeamDashboardPage: React.FC = () => {
                 console.error("Error submitting answer progress:", error);
                 toast.error(`Submission failed: ${error.message}. Please contact an admin.`);
                 
-                // Revert optimistic UI update on failure
                 setSubmitStatus(prev => ({ ...prev, [clueId]: 'idle' }));
                 setAwardedCoins(prev => {
                     const newAwards = {...prev};
@@ -306,13 +319,14 @@ const TeamDashboardPage: React.FC = () => {
     const solvedCount = progress.length;
     const totalClues = clues.length;
     const progressPercentage = totalClues > 0 ? (solvedCount / totalClues) * 100 : 0;
+    const allCluesSolved = totalClues > 0 && solvedCount === totalClues;
 
     return (
         <PageTransition>
             <div className="relative w-full max-w-7xl mx-auto backdrop-blur-sm bg-black/30 p-4 sm:p-8 rounded-2xl border-2 border-[#ff7b00]/50">
                 <div className="absolute top-4 right-4 z-20 flex items-center gap-4">
                      <GlowingButton 
-                        onClick={logout} 
+                        onClick={handleLogout} 
                         className="!py-1 !px-3 !border-red-500 group-hover:!bg-red-500 !text-xs"
                     >
                         Logout
@@ -321,7 +335,6 @@ const TeamDashboardPage: React.FC = () => {
                 <div className="relative z-10">
                     <div className="text-center mb-8">
                         <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-glow">{team.name}</h1>
-                        <p className="text-xl font-rajdhani text-gray-300 mt-2">Domain: <span className="font-bold text-[#ff7b00]">{team.domain}</span></p>
                         <p className="text-2xl font-orbitron text-gray-200 mt-4">
                             Total Coins: <span className="font-bold text-yellow-400 text-glow">{team.coins} 🪙</span>
                         </p>
@@ -332,7 +345,7 @@ const TeamDashboardPage: React.FC = () => {
                             <h3 className="text-xl font-orbitron text-center text-gray-400 uppercase tracking-widest mb-3">Mission Progress</h3>
                             <div className="w-full bg-black/50 border-2 border-[#ff7b00]/30 rounded-full p-1 pulse-glow">
                                 <motion.div
-                                    className="h-4 bg-gradient-to-r from-[#ff7b00] to-yellow-400 rounded-full shadow-lg shadow-[#ff7b00]/50"
+                                    className="h-4 bg-gradient-to-r from-[#ff7b00] to-yellow-400 rounded-full shadow-lg shadow-[#ff7b00]/50 progress-bar-shimmer"
                                     initial={{ width: '0%' }}
                                     animate={{ width: `${progressPercentage}%` }}
                                     transition={{ duration: 1, ease: [0.42, 0, 0.58, 1] }}
@@ -373,7 +386,15 @@ const TeamDashboardPage: React.FC = () => {
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 <div className="lg:col-span-2 space-y-6">
                                     <h2 className="text-3xl font-orbitron text-glow-blue border-b-2 border-[#00eaff]/30 pb-2">Your Clues</h2>
-                                    {sortedClues.length > 0 ? (
+                                     {allCluesSolved ? (
+                                        <div className="flex flex-col items-center justify-center text-center p-8 bg-black/40 border-2 border-dashed border-green-500/80 rounded-lg min-h-[40vh]">
+                                            <div className="text-6xl mb-4">🏆</div>
+                                            <h2 className="text-4xl font-orbitron text-green-300 text-glow-green">TRANSMISSION COMPLETE</h2>
+                                            <p className="mt-4 text-xl text-green-200 max-w-2xl">
+                                                Congratulations, your team has decrypted all clues in your domain! Your final score is locked in. Keep an eye on the live leaderboard for final standings.
+                                            </p>
+                                        </div>
+                                     ) : sortedClues.length > 0 ? (
                                         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                                             {sortedClues.map((clue, index) => {
                                                 const isClueSolved = progressMap.has(clue.id);

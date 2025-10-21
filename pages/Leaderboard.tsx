@@ -4,16 +4,20 @@ import { LeaderboardEntry } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import SkeletonLoader from '../components/SkeletonLoader';
+import { useToast } from '../components/Toast';
 
 const LeaderboardPage: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [eventStatus, setEventStatus] = useState<'stopped' | 'running' | null>(null);
+    const toast = useToast();
 
     const fetchLeaderboardAndStatus = async () => {
         // Fetch event status first
-        const { data: eventData } = await supabase.from('event').select('status').eq('id', 1).single();
-        if (eventData) {
+        const { data: eventData, error: eventError } = await supabase.from('event').select('status').eq('id', 1).single();
+        if (eventError) {
+            toast.error(`Failed to get event status: ${eventError.message}`);
+        } else if (eventData) {
             setEventStatus(eventData.status);
         }
 
@@ -21,6 +25,7 @@ const LeaderboardPage: React.FC = () => {
         const { data: teams, error: teamsError } = await supabase.from('teams').select('*');
         if (teamsError) {
             console.error(teamsError);
+            toast.error(`Failed to load teams: ${teamsError.message}`);
             setLoading(false);
             return;
         }
@@ -28,6 +33,7 @@ const LeaderboardPage: React.FC = () => {
         const { data: progress, error: progressError } = await supabase.from('team_progress').select('*');
         if (progressError) {
             console.error(progressError);
+            toast.error(`Failed to load team progress: ${progressError.message}`);
             setLoading(false);
             return;
         }
@@ -47,12 +53,12 @@ const LeaderboardPage: React.FC = () => {
             };
         });
 
-        // Sort by clues solved (desc), then coins (desc), then time (asc), then ID (asc)
+        // Sort by coins (desc), then clues solved (desc), then time (asc), then ID (asc)
         boardData.sort((a, b) => {
-            // 1. Descending by clues solved
-            if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
-            // 2. Descending by coins
+            // 1. Descending by coins
             if (b.coins !== a.coins) return b.coins - a.coins;
+            // 2. Descending by clues solved
+            if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
             // 3. Ascending by last solve time (earlier is better)
             if (a.lastSolveTime && b.lastSolveTime) {
                 const timeA = new Date(a.lastSolveTime).getTime();
