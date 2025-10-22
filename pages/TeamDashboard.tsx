@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
@@ -395,7 +396,7 @@ const TeamDashboardPage: React.FC = () => {
                                             </p>
                                         </div>
                                      ) : sortedClues.length > 0 ? (
-                                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                                        <div className="space-y-4 max-h-[60vh] overflow-y-auto overflow-x-hidden pr-2">
                                             {sortedClues.map((clue, index) => {
                                                 const isClueSolved = progressMap.has(clue.id);
                                                 const status = submitStatus[clue.id] || 'idle';

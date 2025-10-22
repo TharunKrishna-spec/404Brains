@@ -455,22 +455,28 @@
         100% { clip-path: inset(55% 0 40% 0); transform: translate(-2px, 3px); }
       }
       
-      /* --- NEW: Data Stream Typing Effect --- */
+      /* --- UPDATED: Data Stream Typing Effect --- */
       .typing-effect {
         /* Use a CSS variable for character count */
         --char-count: 20; 
         width: 0;
         overflow: hidden;
-        white-space: nowrap;
+        white-space: nowrap; /* Start with nowrap for the animation */
         border-right: 0.15em solid #ff7b00; /* Blinking cursor */
         animation: 
-          typing calc(var(--char-count) * 0.08s) steps(var(--char-count), end) forwards,
+          /* MODIFIED: Speed increased significantly and forwards added to persist the end state */
+          typing calc(var(--char-count) * 0.005s) steps(var(--char-count), end) forwards,
           blink-caret 0.75s step-end infinite;
       }
 
       @keyframes typing {
         from { width: 0; }
-        to { width: 100%; }
+        /* MODIFIED: The final state of the animation */
+        to { 
+          width: 100%; 
+          white-space: normal; /* NEW: Allows text to wrap */
+          border-color: transparent; /* NEW: Hides the cursor after typing */
+        }
       }
 
       @keyframes blink-caret {
