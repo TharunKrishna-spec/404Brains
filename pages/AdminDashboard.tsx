@@ -634,12 +634,12 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 {clues.length > 0 ? clues.map(clue => (
                     <div key={clue.id} className="p-4 bg-white/5 rounded-lg flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                            <p className="font-bold text-lg whitespace-pre-wrap">{clue.text}</p>
-                            <p className="text-sm text-green-400 font-mono">Answer: {clue.answer}</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-bold text-lg whitespace-pre-wrap break-words">{clue.text}</p>
+                            <p className="text-sm text-green-400 font-mono break-words">Answer: {clue.answer}</p>
                             <p className="text-sm text-gray-400">Domain: <span className="font-semibold text-gray-300">{clue.domain}</span></p>
-                            {clue.image_url && <p className="text-xs text-gray-500 truncate">Image: {clue.image_url}</p>}
-                            {clue.link_url && <p className="text-xs text-blue-400 truncate">Link: {clue.link_url}</p>}
+                            {clue.image_url && <p className="text-xs text-gray-500 break-all">Image: {clue.image_url}</p>}
+                            {clue.link_url && <p className="text-xs text-blue-400 break-all">Link: {clue.link_url}</p>}
                         </div>
                         <div className="flex flex-col sm:flex-row sm:space-y-0 sm:space-x-1 items-end">
                             <button 
