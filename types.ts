@@ -14,6 +14,7 @@ export interface Clue {
   answer: string;
   image_url?: string;
   link_url?: string;
+  video_url?: string;
   domain: string;
 }
 

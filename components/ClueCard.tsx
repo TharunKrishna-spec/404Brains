@@ -36,6 +36,23 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
         return 'bg-black/40 border-gray-700 opacity-50';
     }, [isSolved, isCurrentlyActive]);
     
+    const embedUrl = useMemo(() => {
+        if (!clue.video_url) return null;
+        try {
+            const url = new URL(clue.video_url);
+            let videoId: string | null = null;
+            if (url.hostname === 'youtu.be') {
+                videoId = url.pathname.substring(1);
+            } else if (url.hostname === 'www.youtube.com' || url.hostname === 'youtube.com') {
+                videoId = url.searchParams.get('v');
+            }
+            return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+        } catch (e) {
+            console.error("Invalid video URL provided for clue.", e);
+            return null;
+        }
+    }, [clue.video_url]);
+
     return (
         <div className={`p-4 rounded-lg border-2 transition-all duration-500 ${cardStateStyles}`}>
             <div className="flex justify-between items-start">
@@ -59,6 +76,18 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
                     {clue.image_url && (
                         <div className="mt-4">
                             <img src={clue.image_url} alt={`Clue image`} className="max-w-sm rounded-md shadow-lg holographic-image" />
+                        </div>
+                    )}
+                    {embedUrl && (
+                        <div className="mt-4 aspect-video w-full max-w-md mx-auto">
+                            <iframe
+                                className="w-full h-full rounded-md shadow-lg holographic-image"
+                                src={embedUrl}
+                                title={`Clue Video ${clueNumber}`}
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            ></iframe>
                         </div>
                     )}
                     {clue.link_url && (

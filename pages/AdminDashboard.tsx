@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
@@ -491,6 +492,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
     const [newClueDomain, setNewClueDomain] = useState(DOMAINS[0]);
     const [newClueImageUrl, setNewClueImageUrl] = useState('');
     const [newClueLinkUrl, setNewClueLinkUrl] = useState('');
+    const [newClueVideoUrl, setNewClueVideoUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const toast = useToast();
 
@@ -508,6 +510,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
             domain: newClueDomain,
             image_url: newClueImageUrl.trim() || undefined,
             link_url: newClueLinkUrl.trim() || undefined,
+            video_url: newClueVideoUrl.trim() || undefined,
         });
 
         if (error) {
@@ -520,6 +523,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
             setNewClueDomain(DOMAINS[0]);
             setNewClueImageUrl('');
             setNewClueLinkUrl('');
+            setNewClueVideoUrl('');
         }
         setLoading(false);
     };
@@ -532,6 +536,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
                 <input type="text" value={newClueAnswer} onChange={(e) => setNewClueAnswer(e.target.value)} placeholder="Clue answer (case-insensitive)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <input type="url" value={newClueImageUrl} onChange={(e) => setNewClueImageUrl(e.target.value)} placeholder="Image URL (optional)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <input type="url" value={newClueLinkUrl} onChange={(e) => setNewClueLinkUrl(e.target.value)} placeholder="Link URL for searching (optional)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
+                <input type="url" value={newClueVideoUrl} onChange={(e) => setNewClueVideoUrl(e.target.value)} placeholder="Video URL (YouTube, optional)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <select value={newClueDomain} onChange={(e) => setNewClueDomain(e.target.value)} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500">
                     {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                 </select>
@@ -611,7 +616,8 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
             answer: modalState.data.answer.trim().toUpperCase(),
             domain: modalState.data.domain,
             image_url: modalState.data.image_url?.trim() || null,
-            link_url: modalState.data.link_url?.trim() || null
+            link_url: modalState.data.link_url?.trim() || null,
+            video_url: modalState.data.video_url?.trim() || null
         }).eq('id', modalState.data.id);
 
         if (error) {
@@ -640,6 +646,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                             <p className="text-sm text-gray-400">Domain: <span className="font-semibold text-gray-300">{clue.domain}</span></p>
                             {clue.image_url && <p className="text-xs text-gray-500 break-all">Image: {clue.image_url}</p>}
                             {clue.link_url && <p className="text-xs text-blue-400 break-all">Link: {clue.link_url}</p>}
+                            {clue.video_url && <p className="text-xs text-purple-400 break-all">Video: {clue.video_url}</p>}
                         </div>
                         <div className="flex flex-col sm:flex-row sm:space-y-0 sm:space-x-1 items-end">
                             <button 
@@ -702,6 +709,9 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                                 
                                 <label className="block text-sm font-bold text-gray-400">Link URL (Optional)</label>
                                 <input type="url" value={modalState.data.link_url || ''} onChange={(e) => handleEditFormChange({ link_url: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="https://..."/>
+                                
+                                <label className="block text-sm font-bold text-gray-400">Video URL (Optional)</label>
+                                <input type="url" value={modalState.data.video_url || ''} onChange={(e) => handleEditFormChange({ video_url: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="https://youtube.com/..."/>
 
                                 <label className="block text-sm font-bold text-gray-400">Domain</label>
                                 <select value={modalState.data.domain} onChange={(e) => handleEditFormChange({ domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
