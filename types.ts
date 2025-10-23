@@ -3,6 +3,7 @@
 export interface Team {
   id: number;
   name: string;
+  email: string;
   coins: number;
   user_id: string; 
   domain: string;

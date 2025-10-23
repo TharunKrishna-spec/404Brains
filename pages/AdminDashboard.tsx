@@ -248,6 +248,7 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
         const { error: teamError } = await supabase.from('teams').insert({
             name: newTeamName.trim(),
             user_id: signUpData.user.id,
+            email: newTeamEmail.trim(),
             coins: 0,
             domain: newTeamDomain,
         });
@@ -339,16 +340,8 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
 
             if (teamError) throw teamError;
             
-            // 3. Delete the auth user via Edge Function to prevent orphans
-            const { error: functionError } = await supabase.functions.invoke('delete-user', {
-                body: { user_id: teamToDelete.user_id },
-            });
-            // Handle function-specific errors (e.g., user not found) gracefully
-            if (functionError && !functionError.message.includes('User not found')) {
-                throw new Error(functionError.message);
-            }
-            
-            toast.success(`Team "${teamToDelete.name}" and their login credentials have been deleted.`);
+            // 3. Instruct admin to manually delete the auth user
+            toast.success(`Team "${teamToDelete.name}" profile deleted. IMPORTANT: Now, go to the Supabase 'Authentication' section and manually delete the user with email: ${teamToDelete.email}`);
             onTeamsChanged();
             closeDeleteConfirm();
 
@@ -418,6 +411,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
                     <div key={team.id} className="p-4 bg-white/5 rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                         <div>
                             <p className="font-bold text-lg">{team.name}</p>
+                            <p className="text-sm text-gray-400 font-mono">Email: {team.email}</p>
                             <p className="text-sm text-gray-400">Coins: {team.coins} | Domain: <span className="font-semibold text-gray-300">{team.domain}</span></p>
                         </div>
                         <div className="flex space-x-4 self-end sm:self-auto">
@@ -439,11 +433,15 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
                 title="Confirm Team Deletion"
                 message={
                     <>
-                        <p>Are you sure you want to permanently delete team <strong className="font-bold text-white">{teamToDelete?.name}</strong>?</p>
-                        <p className="mt-2 text-sm text-yellow-400">This action will delete the team's profile, all their progress, and <strong className="font-semibold text-red-400">their login credentials</strong>. This cannot be undone.</p>
+                        <p>Are you sure you want to delete team <strong className="font-bold text-white">{teamToDelete?.name}</strong>?</p>
+                        <p className="mt-2 text-sm text-yellow-400">
+                            This will delete the team's profile and all their progress.
+                            <br />
+                            You must then <strong className="font-semibold text-red-400">manually delete their login credentials</strong> for email: <strong className="font-mono text-white">{teamToDelete?.email}</strong> from the Supabase Authentication page. This action cannot be undone.
+                        </p>
                     </>
                 }
-                confirmText="Delete Team"
+                confirmText="Delete Team Data"
                 isConfirming={deletingTeamId === teamToDelete?.id}
             />
              <AnimatePresence>
