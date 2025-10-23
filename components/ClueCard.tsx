@@ -90,16 +90,24 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
                             ></iframe>
                         </div>
                     )}
-                    {clue.link_url && (
-                        <div className="mt-4">
+                    <div className="mt-4 flex flex-wrap gap-4">
+                        {clue.link_url && (
                             <GlowingButton
                                 onClick={() => window.open(clue.link_url, '_blank', 'noopener,noreferrer')}
                                 className="!py-2 !px-4 !text-sm !border-blue-400 group-hover:!bg-blue-400"
                             >
                                 Reference Link
                             </GlowingButton>
-                        </div>
-                    )}
+                        )}
+                        {clue.video_url && (
+                            <GlowingButton
+                                onClick={() => window.open(clue.video_url, '_blank', 'noopener,noreferrer')}
+                                className="!py-2 !px-4 !text-sm !border-red-500 group-hover:!bg-red-500"
+                            >
+                                Watch Video
+                            </GlowingButton>
+                        )}
+                    </div>
                 </>
             )}
             
