@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
@@ -23,6 +24,8 @@ const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 10M20 20l-1.5-1.5A9 9 0 013.5 14" />
     </svg>
 );
+const EditIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
+const DeleteIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 
 
 type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard';
@@ -250,7 +253,7 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
 
         if (teamError) {
              if (teamError.code === '42501' || teamError.message?.includes('permission denied')) {
-                toast.error('Database Permission Denied. Check RLS policies for "teams" table.');
+                toast.error('Database Permission Denied. Check that your RLS policy for the "teams" table allows admin inserts.');
             } else {
                 toast.error(`Failed to create team profile: ${teamError.message}`);
             }
@@ -349,9 +352,10 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
             closeDeleteConfirm();
 
         } catch (e: any) {
-             const errorMessage = e.message?.includes('permission denied')
-                ? `Database Permission Denied. Check RLS policies.`
-                : e.message ? `An error occurred: ${e.message}` : 'An unknown error occurred during team deletion.';
+             const isPermissionError = e.message?.includes('permission denied') || e.code === '42501';
+             const errorMessage = isPermissionError
+                ? `Permission Denied. Check RLS policies and ensure your admin email matches.`
+                : `An error occurred: ${e.message}`;
             toast.error(errorMessage);
             console.error(e);
         } finally {
@@ -382,11 +386,11 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
         }).eq('id', editingTeam.id).select();
 
         if (error) {
-            if (error.code === '42501' || error.message?.includes('permission denied')) {
-                toast.error('Permission Denied. Check RLS policies for the "teams" table.');
-            } else {
-                toast.error('Failed to update team: ' + error.message);
-            }
+            const isPermissionError = error.message?.includes('permission denied') || error.code === '42501';
+            const errorMessage = isPermissionError
+                ? `Permission Denied. Check RLS policies and ensure your admin email matches.`
+                : `Failed to update team: ${error.message}`;
+            toast.error(errorMessage);
         } else {
             toast.success(`Team "${editingTeam.name.trim()}" updated successfully.`);
             onTeamsChanged();
@@ -486,6 +490,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
     const [newClueAnswer, setNewClueAnswer] = useState('');
     const [newClueDomain, setNewClueDomain] = useState(DOMAINS[0]);
     const [newClueImageUrl, setNewClueImageUrl] = useState('');
+    const [newClueLinkUrl, setNewClueLinkUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const toast = useToast();
 
@@ -502,6 +507,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
             answer: newClueAnswer.trim().toUpperCase(),
             domain: newClueDomain,
             image_url: newClueImageUrl.trim() || undefined,
+            link_url: newClueLinkUrl.trim() || undefined,
         });
 
         if (error) {
@@ -513,6 +519,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
             setNewClueAnswer('');
             setNewClueDomain(DOMAINS[0]);
             setNewClueImageUrl('');
+            setNewClueLinkUrl('');
         }
         setLoading(false);
     };
@@ -524,6 +531,7 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
                 <textarea value={newClueText} onChange={(e) => setNewClueText(e.target.value)} placeholder="New clue text..." rows={3} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <input type="text" value={newClueAnswer} onChange={(e) => setNewClueAnswer(e.target.value)} placeholder="Clue answer (case-insensitive)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <input type="url" value={newClueImageUrl} onChange={(e) => setNewClueImageUrl(e.target.value)} placeholder="Image URL (optional)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
+                <input type="url" value={newClueLinkUrl} onChange={(e) => setNewClueLinkUrl(e.target.value)} placeholder="Link URL for searching (optional)..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"/>
                 <select value={newClueDomain} onChange={(e) => setNewClueDomain(e.target.value)} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500">
                     {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                 </select>
@@ -537,61 +545,88 @@ const AddCluesManagement: React.FC<{ onClueAdded: () => void }> = ({ onClueAdded
 
 const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void }> = ({ clues, onCluesChanged }) => {
     const toast = useToast();
-    const [editingClue, setEditingClue] = useState<Clue | null>(null);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isUpdating, setIsUpdating] = useState(false);
-    const [clueToDelete, setClueToDelete] = useState<Clue | null>(null);
+    const [modalState, setModalState] = useState<{ type: 'none' | 'edit' | 'delete', data: Clue | null }>({ type: 'none', data: null });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const openDeleteConfirm = (clue: Clue) => {
-        setClueToDelete(clue);
+    const handleOpenEditModal = (clue: Clue) => {
+        setModalState({ type: 'edit', data: { ...clue } });
+    };
+    
+    const handleOpenDeleteModal = (clue: Clue) => {
+        setModalState({ type: 'delete', data: clue });
+    };
+
+    const handleCloseModals = () => {
+        setModalState({ type: 'none', data: null });
+    };
+
+    const handleEditFormChange = (updates: Partial<Clue>) => {
+        if (modalState.type === 'edit' && modalState.data) {
+            setModalState(prev => ({
+                ...prev,
+                data: { ...prev.data!, ...updates }
+            }));
+        }
     };
 
     const handleDeleteClue = async () => {
-        if (!clueToDelete) return;
-        const { error } = await supabase.from('clues').delete().eq('id', clueToDelete.id);
-        if (error) {
-            toast.error(`Failed to delete clue: ${error.message}`);
-        } else {
-            toast.success(`Clue for domain "${clueToDelete.domain}" deleted.`);
+        if (modalState.type !== 'delete' || !modalState.data) return;
+
+        setIsSubmitting(true);
+        try {
+            const { error: progressError } = await supabase
+                .from('team_progress')
+                .delete()
+                .eq('clue_id', modalState.data.id);
+
+            if (progressError) throw progressError;
+
+            const { error: clueError } = await supabase.from('clues').delete().eq('id', modalState.data.id);
+            
+            if (clueError) throw clueError;
+
+            toast.success(`Clue for domain "${modalState.data.domain}" and all associated progress has been deleted.`);
             onCluesChanged();
+            handleCloseModals();
+        } catch (e: any) {
+            const isPermissionError = e.message?.includes('permission denied') || e.code === '42501';
+            const errorMessage = isPermissionError
+                ? "Permission Denied. Check RLS policies and ensure your admin email matches."
+                : `Failed to delete clue: ${e.message}`;
+            toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
         }
-        setClueToDelete(null); // Close modal
     };
     
-    const handleOpenEditModal = (clue: Clue) => {
-        setEditingClue({ ...clue });
-        setIsEditModalOpen(true);
-    };
-
-    const handleCancelEdit = () => {
-        setIsEditModalOpen(false);
-        setEditingClue(null);
-    };
-
     const handleUpdateClue = async () => {
-        if (!editingClue || !editingClue.text.trim() || !editingClue.answer.trim()) {
+        if (modalState.type !== 'edit' || !modalState.data || !modalState.data.text.trim() || !modalState.data.answer.trim()) {
             toast.error('Clue text and answer cannot be empty.');
             return;
         }
-        setIsUpdating(true);
+        setIsSubmitting(true);
 
         const { error } = await supabase.from('clues').update({
-            text: editingClue.text.trim(),
-            answer: editingClue.answer.trim().toUpperCase(),
-            domain: editingClue.domain,
-            image_url: editingClue.image_url?.trim() || null
-        }).eq('id', editingClue.id);
+            text: modalState.data.text.trim(),
+            answer: modalState.data.answer.trim().toUpperCase(),
+            domain: modalState.data.domain,
+            image_url: modalState.data.image_url?.trim() || null,
+            link_url: modalState.data.link_url?.trim() || null
+        }).eq('id', modalState.data.id);
 
         if (error) {
-            toast.error('Failed to update clue: ' + error.message);
+            const isPermissionError = error.message?.includes('permission denied') || error.code === '42501';
+            const errorMessage = isPermissionError
+                ? `Permission Denied. Check RLS policies and ensure your admin email matches.`
+                : `Failed to update clue: ${error.message}`;
+            toast.error(errorMessage);
         } else {
             toast.success('Clue updated successfully.');
             onCluesChanged();
-            handleCancelEdit();
+            handleCloseModals();
         }
-        setIsUpdating(false);
+        setIsSubmitting(false);
     };
-
 
     return (
         <div>
@@ -600,14 +635,29 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                 {clues.length > 0 ? clues.map(clue => (
                     <div key={clue.id} className="p-4 bg-white/5 rounded-lg flex justify-between items-start gap-4">
                         <div className="flex-1">
-                            <p className="font-bold text-lg">{clue.text}</p>
+                            <p className="font-bold text-lg whitespace-pre-wrap">{clue.text}</p>
                             <p className="text-sm text-green-400 font-mono">Answer: {clue.answer}</p>
                             <p className="text-sm text-gray-400">Domain: <span className="font-semibold text-gray-300">{clue.domain}</span></p>
                             {clue.image_url && <p className="text-xs text-gray-500 truncate">Image: {clue.image_url}</p>}
+                            {clue.link_url && <p className="text-xs text-blue-400 truncate">Link: {clue.link_url}</p>}
                         </div>
-                        <div className="flex flex-col space-y-2 items-end">
-                            <button onClick={() => handleOpenEditModal(clue)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
-                            <button onClick={() => openDeleteConfirm(clue)} className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors">Delete</button>
+                        <div className="flex flex-col sm:flex-row sm:space-y-0 sm:space-x-1 items-end">
+                            <button 
+                                onClick={() => handleOpenEditModal(clue)} 
+                                className="flex items-center gap-1 p-2 rounded-md text-yellow-400 hover:text-yellow-300 hover:bg-white/10 transition-colors"
+                                aria-label={`Edit clue #${clue.id}`}
+                            >
+                                <EditIcon className="w-4 h-4" />
+                                <span className="hidden sm:inline text-sm">Edit</span>
+                            </button>
+                            <button 
+                                onClick={() => handleOpenDeleteModal(clue)} 
+                                className="flex items-center gap-1 p-2 rounded-md text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
+                                aria-label={`Delete clue #${clue.id}`}
+                            >
+                                <DeleteIcon className="w-4 h-4" />
+                                <span className="hidden sm:inline text-sm">Delete</span>
+                            </button>
                         </div>
                     </div>
                 )) : (
@@ -615,21 +665,22 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                 )}
             </div>
             <ConfirmationModal
-                isOpen={!!clueToDelete}
-                onClose={() => setClueToDelete(null)}
+                isOpen={modalState.type === 'delete'}
+                onClose={handleCloseModals}
                 onConfirm={handleDeleteClue}
                 title="Confirm Clue Deletion"
-                message={<>Are you sure you want to permanently delete this clue? <br /><strong className="font-mono text-white mt-2 block">"{clueToDelete?.text}"</strong></>}
+                message={<>Are you sure you want to permanently delete this clue? This will also remove it from any team's progress. <br /><strong className="font-mono text-white mt-2 block">"{modalState.data?.text}"</strong></>}
                 confirmText="Delete Clue"
+                isConfirming={isSubmitting}
             />
              <AnimatePresence>
-                {isEditModalOpen && editingClue && (
+                {modalState.type === 'edit' && modalState.data && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
-                        onClick={handleCancelEdit}
+                        onClick={handleCloseModals}
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
@@ -638,25 +689,28 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                             className="relative w-full max-w-2xl bg-black border-2 border-[#00eaff] rounded-lg p-4 sm:p-6 space-y-4"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit Clue #{editingClue.id}</h3>
+                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit Clue #{modalState.data.id}</h3>
                             <div className="space-y-3">
                                 <label className="block text-sm font-bold text-gray-400">Clue Text</label>
-                                <textarea value={editingClue.text} onChange={(e) => setEditingClue({ ...editingClue, text: e.target.value })} rows={3} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue text"/>
+                                <textarea value={modalState.data.text} onChange={(e) => handleEditFormChange({ text: e.target.value })} rows={3} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue text"/>
                                 
                                 <label className="block text-sm font-bold text-gray-400">Answer</label>
-                                <input type="text" value={editingClue.answer} onChange={(e) => setEditingClue({ ...editingClue, answer: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue answer"/>
+                                <input type="text" value={modalState.data.answer} onChange={(e) => handleEditFormChange({ answer: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="Clue answer"/>
 
                                 <label className="block text-sm font-bold text-gray-400">Image URL (Optional)</label>
-                                <input type="url" value={editingClue.image_url || ''} onChange={(e) => setEditingClue({ ...editingClue, image_url: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="https://..."/>
+                                <input type="url" value={modalState.data.image_url || ''} onChange={(e) => handleEditFormChange({ image_url: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="https://..."/>
+                                
+                                <label className="block text-sm font-bold text-gray-400">Link URL (Optional)</label>
+                                <input type="url" value={modalState.data.link_url || ''} onChange={(e) => handleEditFormChange({ link_url: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md" placeholder="https://..."/>
 
                                 <label className="block text-sm font-bold text-gray-400">Domain</label>
-                                <select value={editingClue.domain} onChange={(e) => setEditingClue({ ...editingClue, domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
+                                <select value={modalState.data.domain} onChange={(e) => handleEditFormChange({ domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
                                     {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                                 </select>
                             </div>
                             <div className="flex justify-end space-x-4 pt-4">
-                                <button onClick={handleCancelEdit} className="px-6 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
-                                <GlowingButton onClick={handleUpdateClue} className="!py-2 !px-6 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdating}>
+                                <button onClick={handleCloseModals} className="px-6 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
+                                <GlowingButton onClick={handleUpdateClue} className="!py-2 !px-6 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isSubmitting}>
                                     Save Changes
                                 </GlowingButton>
                             </div>

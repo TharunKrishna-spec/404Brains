@@ -13,6 +13,7 @@ export interface Clue {
   text: string;
   answer: string;
   image_url?: string;
+  link_url?: string;
   domain: string;
 }
 

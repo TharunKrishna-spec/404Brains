@@ -51,7 +51,7 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
             {isActive && (
                 <>
                     <p 
-                        className="text-gray-300 mt-2 text-lg typing-effect"
+                        className="text-gray-300 mt-2 text-lg typing-effect whitespace-pre-wrap"
                         style={{ '--char-count': clue.text.length } as React.CSSProperties}
                     >
                         {clue.text}
@@ -59,6 +59,16 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
                     {clue.image_url && (
                         <div className="mt-4">
                             <img src={clue.image_url} alt={`Clue image`} className="max-w-sm rounded-md shadow-lg holographic-image" />
+                        </div>
+                    )}
+                    {clue.link_url && (
+                        <div className="mt-4">
+                            <GlowingButton
+                                onClick={() => window.open(clue.link_url, '_blank', 'noopener,noreferrer')}
+                                className="!py-2 !px-4 !text-sm !border-blue-400 group-hover:!bg-blue-400"
+                            >
+                                Reference Link
+                            </GlowingButton>
                         </div>
                     )}
                 </>
