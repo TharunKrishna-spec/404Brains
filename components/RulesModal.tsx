@@ -34,7 +34,7 @@ const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
 
               <div>
                 <h3 className="font-orbitron text-xl text-[#ff7b00] font-bold">Domains</h3>
-                <p>Each team is assigned to one of four domains: <span className="font-semibold text-white">HealthCare, Banking, Food,</span> or <span className="font-semibold text-white">Airlines</span>. You will only receive clues relevant to your domain.</p>
+                <p>Each team is assigned to one of four domains: <span className="font-semibold text-white">HealthCare, Climate, Food,</span> or <span className="font-semibold text-white">Airlines</span>. You will only receive clues relevant to your domain.</p>
               </div>
 
               <div>
