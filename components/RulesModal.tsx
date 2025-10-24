@@ -29,12 +29,7 @@ const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
             <div className="space-y-4 text-gray-300 font-rajdhani text-lg max-h-[70vh] overflow-y-auto pr-4">
               <div>
                 <h3 className="font-orbitron text-xl text-[#ff7b00] font-bold">Objective</h3>
-                <p>Solve a series of cryptic clues within your assigned domain to earn coins and climb the leaderboard. The top four participants on the leaderboard will receive a surprise useful for the next solveathon!</p>
-              </div>
-
-              <div>
-                <h3 className="font-orbitron text-xl text-[#ff7b00] font-bold">Domains</h3>
-                <p>Each team is assigned to one of four domains: <span className="font-semibold text-white">HealthCare, Climate, Food,</span> or <span className="font-semibold text-white">Airlines</span>. You will only receive clues relevant to your domain.</p>
+                <p>Solve a series of cryptic clues to earn coins and climb the leaderboard. The top four participants on the leaderboard will receive a surprise useful for the next solveathon!</p>
               </div>
 
               <div>
