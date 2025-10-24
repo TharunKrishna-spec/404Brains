@@ -12,6 +12,9 @@ interface ConfirmationModalProps {
   cancelText?: string;
   isConfirming?: boolean;
   confirmButtonClassName?: string;
+  borderColorClassName?: string;
+  shadowClassName?: string;
+  titleColorClassName?: string;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -24,6 +27,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelText = 'Cancel',
   isConfirming = false,
   confirmButtonClassName,
+  borderColorClassName,
+  shadowClassName,
+  titleColorClassName,
 }) => {
   return (
     <AnimatePresence>
@@ -39,10 +45,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
-            className="relative w-full max-w-lg bg-black border-2 border-red-500 rounded-lg p-6 space-y-4 shadow-2xl shadow-red-500/20"
+            className={`relative w-full max-w-lg bg-black border-2 ${borderColorClassName || 'border-red-500'} rounded-lg p-6 space-y-4 shadow-2xl ${shadowClassName || 'shadow-red-500/20'}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-2xl font-orbitron text-red-400">{title}</h3>
+            <h3 className={`text-2xl font-orbitron ${titleColorClassName || 'text-red-400'}`}>{title}</h3>
             <div className="text-gray-300 font-rajdhani">{message}</div>
             <div className="flex space-x-4 justify-end pt-4">
               <button

@@ -13,11 +13,13 @@ interface ClueCardProps {
     currentAnswer: string;
     awardedCoins: number | undefined;
     isActive: boolean;
+    isSkipping: boolean;
     onAnswerChange: (clueId: number, value: string) => void;
     onSubmitAnswer: (clueId: number) => void;
+    onSkipClue: (clueId: number) => void;
 }
 
-const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status, currentAnswer, awardedCoins, isActive, onAnswerChange, onSubmitAnswer }) => {
+const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status, currentAnswer, awardedCoins, isActive, isSkipping, onAnswerChange, onSubmitAnswer, onSkipClue }) => {
     
     const isCurrentlyActive = isActive && !isSolved;
     
@@ -112,27 +114,38 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
             )}
             
             {isCurrentlyActive && (
-                <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                    <input 
-                        type="text" 
-                        placeholder="Enter your answer..."
-                        value={currentAnswer || ''}
-                        onChange={(e) => onAnswerChange(clue.id, e.target.value)}
-                        className={`flex-1 px-4 py-2 bg-transparent border-2 rounded-md focus:outline-none placeholder-gray-500 transition-all duration-300
-                            ${status === 'incorrect' ? 'border-red-500 animate-shake' : ''}
-                            ${status === 'correct' ? 'border-green-500 text-green-400' : ''}
-                            ${status === 'idle' || status === 'loading' ? 'border-[#ff7b00]/50 focus:border-[#ff7b00]' : ''}
-                        `}
-                        disabled={status === 'loading' || status === 'correct'}
-                    />
-                    <GlowingButton 
-                        onClick={() => onSubmitAnswer(clue.id)} 
-                        loading={status === 'loading'}
-                        disabled={status === 'correct' || !currentAnswer}
-                    >
-                        Submit
-                    </GlowingButton>
-                </div>
+                <>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="Enter your answer..."
+                            value={currentAnswer || ''}
+                            onChange={(e) => onAnswerChange(clue.id, e.target.value)}
+                            className={`flex-1 px-4 py-2 bg-transparent border-2 rounded-md focus:outline-none placeholder-gray-500 transition-all duration-300
+                                ${status === 'incorrect' ? 'border-red-500 animate-shake' : ''}
+                                ${status === 'correct' ? 'border-green-500 text-green-400' : ''}
+                                ${status === 'idle' || status === 'loading' ? 'border-[#ff7b00]/50 focus:border-[#ff7b00]' : ''}
+                            `}
+                            disabled={status === 'loading' || status === 'correct' || isSkipping}
+                        />
+                        <GlowingButton 
+                            onClick={() => onSubmitAnswer(clue.id)} 
+                            loading={status === 'loading'}
+                            disabled={status === 'correct' || !currentAnswer || isSkipping}
+                        >
+                            Submit
+                        </GlowingButton>
+                    </div>
+                    <div className="mt-3 text-center">
+                        <button 
+                            onClick={() => onSkipClue(clue.id)}
+                            disabled={status === 'loading' || status === 'correct' || isSkipping}
+                            className="text-sm text-gray-400 hover:text-yellow-400 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Stuck? Skip this clue for 20 coins
+                        </button>
+                    </div>
+                </>
             )}
             
             {!isSolved && !isActive && (

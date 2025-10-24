@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
 import { useAuth } from '../hooks/useAuth';
@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SkeletonLoader from '../components/SkeletonLoader';
 import ClueCard from '../components/ClueCard';
 import { useToast } from '../components/Toast';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const CheckIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
 
@@ -97,6 +98,8 @@ const TeamDashboardPage: React.FC = () => {
     const [submitStatus, setSubmitStatus] = useState<{ [clueId: number]: 'idle' | 'loading' | 'correct' | 'incorrect' }>({});
     const [awardedCoins, setAwardedCoins] = useState<{ [clueId: number]: number }>({});
     const toast = useToast();
+    const [clueToSkip, setClueToSkip] = useState<Clue | null>(null);
+    const [isSkipping, setIsSkipping] = useState(false);
     
     useEffect(() => {
         const fetchTeamData = async () => {
@@ -168,7 +171,7 @@ const TeamDashboardPage: React.FC = () => {
             supabase.removeChannel(channel);
         };
 
-    }, [user]);
+    }, [user, toast]);
 
     const sortedClues = useMemo(() => [...clues].sort((a, b) => a.id - b.id), [clues]);
     const progressMap = useMemo(() => {
@@ -302,6 +305,48 @@ const TeamDashboardPage: React.FC = () => {
             }, 2000);
         }
     };
+    
+    const handleOpenSkipConfirm = useCallback((clueId: number) => {
+        const clue = sortedClues.find(c => c.id === clueId);
+        if (clue) {
+            setClueToSkip(clue);
+        }
+    }, [sortedClues]);
+
+    const handleConfirmSkip = async () => {
+        if (!team || !clueToSkip) return;
+
+        setIsSkipping(true);
+
+        const newCoins = (team.coins || 0) - 20;
+        const skipTime = new Date();
+
+        try {
+            const { error: progressError } = await supabase.from('team_progress').insert({ 
+                team_id: team.id, 
+                clue_id: clueToSkip.id, 
+                solved_at: skipTime.toISOString() 
+            });
+            if (progressError) throw progressError;
+
+            const { error: teamUpdateError } = await supabase.from('teams').update({ coins: newCoins }).eq('id', team.id);
+            if (teamUpdateError) throw teamUpdateError;
+            
+            toast.info(`Clue skipped. 20 coins deducted.`);
+            
+            // Optimistic update for faster UI response
+            const newProgressRecord: TeamProgress = { team_id: team.id, clue_id: clueToSkip.id, solved_at: skipTime.toISOString() };
+            setProgress(prev => [...prev, newProgressRecord]);
+            setTeam(prev => prev ? { ...prev, coins: newCoins } : null);
+            
+        } catch (error: any) {
+            console.error("Error skipping clue:", error);
+            toast.error(`Failed to skip clue: ${error.message}. Please try again.`);
+        } finally {
+            setIsSkipping(false);
+            setClueToSkip(null); // Close the modal
+        }
+    };
 
     if (loading) {
         return <TeamDashboardSkeleton />;
@@ -412,8 +457,10 @@ const TeamDashboardPage: React.FC = () => {
                                                         currentAnswer={currentAnswer[clue.id]}
                                                         awardedCoins={awardedCoins[clue.id]}
                                                         isActive={isUnlocked}
+                                                        isSkipping={isSkipping}
                                                         onAnswerChange={handleAnswerChange}
                                                         onSubmitAnswer={handleSubmitAnswer}
+                                                        onSkipClue={handleOpenSkipConfirm}
                                                     />
                                                 )
                                             })}
@@ -431,6 +478,26 @@ const TeamDashboardPage: React.FC = () => {
                     </AnimatePresence>
                 </div>
             </div>
+             <ConfirmationModal
+                isOpen={!!clueToSkip}
+                onClose={() => setClueToSkip(null)}
+                onConfirm={handleConfirmSkip}
+                title="Confirm Skip Clue"
+                message={
+                    <>
+                        <p>Are you sure you want to skip this clue?</p>
+                        <p className="mt-2 text-lg font-bold text-yellow-400">
+                            This will deduct <strong className="font-orbitron">20 COINS</strong> from your total. This action cannot be undone.
+                        </p>
+                    </>
+                }
+                confirmText="Yes, Skip It"
+                isConfirming={isSkipping}
+                borderColorClassName="border-yellow-500"
+                shadowClassName="shadow-yellow-500/20"
+                titleColorClassName="text-yellow-400"
+                confirmButtonClassName="!py-2 !px-6 !border-yellow-500 group-hover:!bg-yellow-500"
+            />
         </PageTransition>
     );
 };
