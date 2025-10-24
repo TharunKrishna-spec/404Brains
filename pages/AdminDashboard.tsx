@@ -1025,6 +1025,9 @@ const ViewProblemStatementsManagement: React.FC<{ problemStatements: ProblemStat
     const [purchaseCounts, setPurchaseCounts] = useState<Record<number, number>>({});
     const [purchaseLimit, setPurchaseLimit] = useState(3);
     const toast = useToast();
+    
+    const [modalState, setModalState] = useState<{ type: 'none' | 'edit' | 'delete', data: ProblemStatement | null }>({ type: 'none', data: null });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchCountsAndLimit = async () => {
@@ -1054,8 +1057,80 @@ const ViewProblemStatementsManagement: React.FC<{ problemStatements: ProblemStat
         fetchCountsAndLimit();
     }, [problemStatements, toast]);
 
-    const handleDelete = async (psId: number) => {
-        toast.info(`Delete functionality for PS #${psId} would be implemented here.`);
+    const handleOpenEditModal = (ps: ProblemStatement) => {
+        setModalState({ type: 'edit', data: { ...ps } });
+    };
+
+    const handleOpenDeleteModal = (ps: ProblemStatement) => {
+        setModalState({ type: 'delete', data: ps });
+    };
+
+    const handleCloseModals = () => {
+        setModalState({ type: 'none', data: null });
+    };
+    
+    const handleEditFormChange = (updates: Partial<ProblemStatement>) => {
+        if (modalState.type === 'edit' && modalState.data) {
+            setModalState(prev => ({
+                ...prev,
+                data: { ...prev.data!, ...updates }
+            }));
+        }
+    };
+
+    const handleDeleteProblemStatement = async () => {
+        if (modalState.type !== 'delete' || !modalState.data) return;
+
+        setIsSubmitting(true);
+        try {
+            // First delete any purchases of this statement. This is crucial if cascade delete is not set up on the DB.
+            const { error: purchaseError } = await supabase
+                .from('problem_statement_purchases')
+                .delete()
+                .eq('problem_statement_id', modalState.data.id);
+            if (purchaseError) throw purchaseError;
+
+            // Then, delete the problem statement itself.
+            const { error: psError } = await supabase
+                .from('problem_statements')
+                .delete()
+                .eq('id', modalState.data.id);
+            if (psError) throw psError;
+
+            toast.success(`Problem Statement "${modalState.data.title}" deleted.`);
+            onProblemStatementsChanged();
+            handleCloseModals();
+        } catch (e: any) {
+            toast.error(`Deletion failed: ${e.message}`);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    const handleUpdateProblemStatement = async () => {
+        if (modalState.type !== 'edit' || !modalState.data) return;
+        const { title, description, cost, domain, id } = modalState.data;
+        const costValue = Number(cost);
+
+        if (!title.trim() || !description.trim() || isNaN(costValue) || costValue < 0) {
+            toast.error('Title, description are required and cost must be a non-negative number.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        const { error } = await supabase
+            .from('problem_statements')
+            .update({ title: title.trim(), description: description.trim(), cost: costValue, domain })
+            .eq('id', id);
+
+        if (error) {
+            toast.error(`Update failed: ${error.message}`);
+        } else {
+            toast.success(`Problem Statement "${title.trim()}" updated.`);
+            onProblemStatementsChanged();
+            handleCloseModals();
+        }
+        setIsSubmitting(false);
     };
 
     return (
@@ -1065,20 +1140,83 @@ const ViewProblemStatementsManagement: React.FC<{ problemStatements: ProblemStat
                 {problemStatements.map(ps => {
                     const count = purchaseCounts[ps.id] || 0;
                     return (
-                        <div key={ps.id} className="p-4 bg-white/5 rounded-lg">
-                            <p className="font-bold text-lg">{ps.title}</p>
-                            <p className="text-sm text-gray-300 whitespace-pre-wrap">{ps.description}</p>
-                            <div className="mt-2 flex justify-between items-center text-sm">
-                                <span className="font-mono text-yellow-400">Cost: {ps.cost} 🪙</span>
-                                <span className="font-mono text-gray-400">Domain: {ps.domain}</span>
-                                <span className={`font-mono ${count >= purchaseLimit ? 'text-red-500' : 'text-green-400'}`}>
-                                    Purchased: {count} / {purchaseLimit}
-                                </span>
+                        <div key={ps.id} className="p-4 bg-white/5 rounded-lg flex flex-col justify-between">
+                            <div>
+                                <p className="font-bold text-lg">{ps.title}</p>
+                                <p className="text-sm text-gray-300 whitespace-pre-wrap">{ps.description}</p>
+                                <div className="mt-2 flex flex-wrap justify-between items-center text-sm gap-x-4 gap-y-1">
+                                    <span className="font-mono text-yellow-400">Cost: {ps.cost} 🪙</span>
+                                    <span className="font-mono text-gray-400">Domain: {ps.domain}</span>
+                                    <span className={`font-mono ${count >= purchaseLimit ? 'text-red-500' : 'text-green-400'}`}>
+                                        Purchased: {count} / {purchaseLimit}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex space-x-2 self-end mt-4">
+                                <button onClick={() => handleOpenEditModal(ps)} className="flex items-center gap-1 p-2 rounded-md text-yellow-400 hover:text-yellow-300 hover:bg-white/10 transition-colors" aria-label={`Edit ${ps.title}`}>
+                                    <EditIcon className="w-4 h-4" />
+                                    <span className="hidden sm:inline text-sm">Edit</span>
+                                </button>
+                                <button onClick={() => handleOpenDeleteModal(ps)} className="flex items-center gap-1 p-2 rounded-md text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors" aria-label={`Delete ${ps.title}`}>
+                                    <DeleteIcon className="w-4 h-4" />
+                                    <span className="hidden sm:inline text-sm">Delete</span>
+                                </button>
                             </div>
                         </div>
                     );
                 })}
             </div>
+             <ConfirmationModal
+                isOpen={modalState.type === 'delete'}
+                onClose={handleCloseModals}
+                onConfirm={handleDeleteProblemStatement}
+                title="Confirm Deletion"
+                message={<>Are you sure you want to permanently delete this Problem Statement? This will also remove any purchase records. <br /><strong className="font-mono text-white mt-2 block">"{modalState.data?.title}"</strong></>}
+                confirmText="Delete Statement"
+                isConfirming={isSubmitting}
+            />
+             <AnimatePresence>
+                {modalState.type === 'edit' && modalState.data && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+                        onClick={handleCloseModals}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="relative w-full max-w-2xl bg-black border-2 border-[#00eaff] rounded-lg p-4 sm:p-6 space-y-4"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 className="text-2xl font-orbitron text-glow-blue">Edit Problem Statement</h3>
+                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                                <label className="block text-sm font-bold text-gray-400">Title</label>
+                                <input type="text" value={modalState.data.title} onChange={(e) => handleEditFormChange({ title: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
+                                
+                                <label className="block text-sm font-bold text-gray-400">Description</label>
+                                <textarea value={modalState.data.description} onChange={(e) => handleEditFormChange({ description: e.target.value })} rows={4} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
+
+                                <label className="block text-sm font-bold text-gray-400">Cost</label>
+                                <input type="number" value={modalState.data.cost} onChange={(e) => handleEditFormChange({ cost: parseInt(e.target.value, 10) || 0 })} min="0" className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
+
+                                <label className="block text-sm font-bold text-gray-400">Domain</label>
+                                <select value={modalState.data.domain} onChange={(e) => handleEditFormChange({ domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
+                                    {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex justify-end space-x-4 pt-4">
+                                <button onClick={handleCloseModals} className="px-6 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
+                                <GlowingButton onClick={handleUpdateProblemStatement} className="!py-2 !px-6 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isSubmitting}>
+                                    Save Changes
+                                </GlowingButton>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
