@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
@@ -259,20 +258,32 @@ const TeamDashboardPage: React.FC = () => {
             if (elapsedSeconds <= 5 * 60) coinsToAdd = 30;
             else if (elapsedSeconds <= 10 * 60) coinsToAdd = 20;
             
+            // Optimistically update UI to show correct state
             setAwardedCoins(prev => ({ ...prev, [clueId]: coinsToAdd }));
             setSubmitStatus(prev => ({ ...prev, [clueId]: 'correct' }));
 
             try {
-                await supabase.rpc('submit_answer', {
+                // Perform the database update
+                const { error } = await supabase.rpc('submit_answer', {
                     in_team_id: team.id,
                     in_clue_id: clueId,
                     in_solved_at: solveTime.toISOString(),
                     in_coins_to_add: coinsToAdd
                 });
-                // Real-time listener will handle UI updates.
+
+                // If the database call returns an error, throw it to be handled by the catch block
+                if (error) {
+                    throw error;
+                }
+
+                // For immediate and reliable UI feedback, manually refetch all data.
+                // This ensures the next clue unlocks right away.
+                await fetchAllData();
+
             } catch (error: any) {
                 console.error("Error submitting answer progress:", error);
                 toast.error(`Submission failed: ${error.message}. Please contact an admin.`);
+                // IMPORTANT: If the submission fails, revert the optimistic UI update.
                 setSubmitStatus(prev => ({ ...prev, [clueId]: 'idle' }));
             }
         } else {
