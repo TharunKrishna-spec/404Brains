@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LeaderboardEntry } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,29 +23,45 @@ const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
+// --- NEW: Live indicator component with status ---
+const LiveIndicator: React.FC<{ status: 'connecting' | 'subscribed' | 'error' }> = ({ status }) => {
+    const statusConfig = {
+        connecting: { pingColor: 'bg-yellow-400', dotColor: 'bg-yellow-500', title: 'Connecting to live updates...' },
+        subscribed: { pingColor: 'bg-green-400', dotColor: 'bg-green-500', title: 'Live updates enabled' },
+        error: { pingColor: 'bg-red-400', dotColor: 'bg-red-500', title: 'Live updates disconnected. Please refresh.' },
+    };
+    const config = statusConfig[status];
+    return (
+        <div className="relative flex h-3 w-3" title={config.title}>
+            {status !== 'error' && ( <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.pingColor} opacity-75`}></span> )}
+            <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotColor}`}></span>
+        </div>
+    );
+};
+
 
 const LiveLeaderboard: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [subscriptionStatus, setSubscriptionStatus] = useState<'connecting' | 'subscribed' | 'error'>('connecting');
 
-    const fetchLeaderboard = async () => {
-        // Set loading to true only for the initial fetch
-        if (leaderboard.length === 0 && !isRefreshing) {
+    const fetchLeaderboard = useCallback(async (isInitialLoad = false) => {
+        if (isInitialLoad) {
             setLoading(true);
         }
         
         const { data: teams, error: teamsError } = await supabase.from('teams').select('*');
         if (teamsError) {
             console.error(teamsError);
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
             return;
         }
 
         const { data: progress, error: progressError } = await supabase.from('team_progress').select('*');
         if (progressError) {
             console.error(progressError);
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
             return;
         }
 
@@ -65,49 +81,52 @@ const LiveLeaderboard: React.FC = () => {
         });
 
         boardData.sort((a, b) => {
-            // 1. Descending by coins
             if (b.coins !== a.coins) return b.coins - a.coins;
-            // 2. Descending by clues solved
             if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
-            // 3. Ascending by last solve time (earlier is better)
             if (a.lastSolveTime && b.lastSolveTime) {
                 const timeA = new Date(a.lastSolveTime).getTime();
                 const timeB = new Date(b.lastSolveTime).getTime();
                 if(timeA !== timeB) return timeA - timeB;
             }
-            // 4. Tie-breaker: Ascending by Team ID for consistency
             return a.id - b.id;
         });
         
         setLeaderboard(boardData.map((item, index) => ({ ...item, rank: index + 1 })));
-        setLoading(false);
-    };
+
+        if (isInitialLoad) {
+            setLoading(false);
+        }
+    }, []);
 
     const handleRefresh = async () => {
         if (isRefreshing) return;
         setIsRefreshing(true);
-        await fetchLeaderboard();
+        await fetchLeaderboard(false);
         setIsRefreshing(false);
     };
 
     useEffect(() => {
-        fetchLeaderboard();
+        fetchLeaderboard(true); // Initial fetch with loading state
 
         const channel = supabase
             .channel('public:live_leaderboard')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboard)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboard)
-            // FIX: The subscribe method requires a callback to handle subscription status.
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    // console.log('Subscribed to live leaderboard updates.');
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, () => fetchLeaderboard(false))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchLeaderboard(false))
+            .subscribe((status, err) => {
+                 if (status === 'SUBSCRIBED') {
+                    setSubscriptionStatus('subscribed');
+                } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                    console.error('Subscription error:', err);
+                    setSubscriptionStatus('error');
+                } else if (status === 'CLOSED') {
+                    setSubscriptionStatus('error');
                 }
             });
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [fetchLeaderboard]);
 
     const getRankEmoji = (rank: number) => {
         if (rank === 1) return '🏆';
@@ -119,7 +138,10 @@ const LiveLeaderboard: React.FC = () => {
     return (
         <div className="h-full bg-black/50 border-2 border-[#ff7b00]/50 rounded-lg shadow-lg shadow-[#ff7b00]/10 flex flex-col">
             <div className="flex justify-between items-center p-4 border-b-2 border-[#ff7b00]/50">
-                <h2 className="text-2xl font-orbitron text-center text-glow">Live Standings</h2>
+                <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-orbitron text-center text-glow">Live Standings</h2>
+                    <LiveIndicator status={subscriptionStatus} />
+                </div>
                 <button
                     onClick={handleRefresh}
                     disabled={isRefreshing}

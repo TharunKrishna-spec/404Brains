@@ -1,5 +1,4 @@
 
-
 export interface Team {
   id: number;
   name: string;
@@ -34,10 +33,26 @@ export interface LeaderboardEntry {
   lastSolveTime: string | null;
 }
 
-// FIX: Added the missing 'Message' type definition, which is used in ChatBox.tsx.
 export interface Message {
   id: number;
   sender: string;
   text: string;
   created_at: string;
+}
+
+// --- NEW: Types for the Marketplace Feature ---
+export interface ProblemStatement {
+  id: number;
+  created_at: string;
+  title: string;
+  description: string;
+  cost: number;
+  domain: string;
+}
+
+export interface ProblemStatementPurchase {
+  id: number;
+  created_at: string;
+  team_id: number;
+  problem_statement_id: number;
 }
