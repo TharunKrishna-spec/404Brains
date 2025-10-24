@@ -175,15 +175,21 @@ const TeamDashboardPage: React.FC = () => {
         fetchAllData();
         const channel = supabase.channel(`team-dashboard-changes-${user?.id}`)
             .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-                // Refetch all data on any change for simplicity and consistency
                 fetchAllData();
             })
-            .subscribe();
+            .subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log('Successfully subscribed to team-dashboard changes!');
+                } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                    console.error('Subscription error:', err);
+                    toast.error('Live connection lost. Data may be stale.');
+                }
+            });
 
         return () => { 
             supabase.removeChannel(channel);
         };
-    }, [user, fetchAllData]);
+    }, [user, fetchAllData, toast]);
 
     const sortedClues = useMemo(() => [...clues].sort((a, b) => a.id - b.id), [clues]);
     const progressMap = useMemo(() => {
@@ -258,12 +264,24 @@ const TeamDashboardPage: React.FC = () => {
             if (elapsedSeconds <= 5 * 60) coinsToAdd = 30;
             else if (elapsedSeconds <= 10 * 60) coinsToAdd = 20;
             
-            // Optimistically update UI to show correct state
+            // --- START: Optimistic Update Logic ---
+            // 1. Show immediate visual feedback
             setAwardedCoins(prev => ({ ...prev, [clueId]: coinsToAdd }));
             setSubmitStatus(prev => ({ ...prev, [clueId]: 'correct' }));
+            
+            // 2. Create the new progress record for optimistic state update
+            const newProgressRecord: TeamProgress = {
+                team_id: team.id,
+                clue_id: clueId,
+                solved_at: solveTime.toISOString(),
+            };
+            
+            // 3. Update the progress and team coins in the local state to instantly unlock the next clue
+            setProgress(currentProgress => [...currentProgress, newProgressRecord]);
+            setTeam(currentTeam => ({ ...currentTeam!, coins: currentTeam!.coins + coinsToAdd }));
 
+            // 4. Send the update to the database.
             try {
-                // Perform the database update
                 const { error } = await supabase.rpc('submit_answer', {
                     in_team_id: team.id,
                     in_clue_id: clueId,
@@ -271,21 +289,28 @@ const TeamDashboardPage: React.FC = () => {
                     in_coins_to_add: coinsToAdd
                 });
 
-                // If the database call returns an error, throw it to be handled by the catch block
-                if (error) {
-                    throw error;
-                }
-
-                // For immediate and reliable UI feedback, manually refetch all data.
-                // This ensures the next clue unlocks right away.
-                await fetchAllData();
+                if (error) throw error;
+                // Success! The optimistic state was correct. The UI is already updated.
+                // We'll let the real-time listener sync the state if needed, but the user experience is already handled.
 
             } catch (error: any) {
+                // 5. If the database call fails, revert the optimistic state changes.
                 console.error("Error submitting answer progress:", error);
-                toast.error(`Submission failed: ${error.message}. Please contact an admin.`);
-                // IMPORTANT: If the submission fails, revert the optimistic UI update.
+                toast.error(`Submission failed: ${error.message}. Reverting changes.`);
+                
+                // Revert by refetching the source of truth from the database.
+                fetchAllData(); 
+                
+                // Also reset the submit status for the failed clue
                 setSubmitStatus(prev => ({ ...prev, [clueId]: 'idle' }));
+                setAwardedCoins(prev => {
+                    const newState = {...prev};
+                    delete newState[clueId];
+                    return newState;
+                });
             }
+            // --- END: Optimistic Update Logic ---
+
         } else {
             setSubmitStatus(prev => ({ ...prev, [clueId]: 'incorrect' }));
             setTimeout(() => setSubmitStatus(prev => ({ ...prev, [clueId]: 'idle' })), 2000);
