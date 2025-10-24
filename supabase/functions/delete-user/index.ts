@@ -1,5 +1,5 @@
-// FIX: The CDN URL for Deno types was incorrect. Switched to a working esm.sh URL to resolve Deno type errors.
-/// <reference types="https://esm.sh/@supabase/functions-js@2/src/edge-runtime.d.ts" />
+// FIX: The path to the Deno type definition file in the CDN URL was incorrect, pointing to /src/ instead of /dist/. This has been corrected to resolve the "Cannot find name 'Deno'" errors.
+/// <reference types="https://esm.sh/@supabase/functions-js@2/dist/edge-runtime.d.ts" />
 
 // This file is deployed as a Supabase Edge Function.
 // It securely handles the deletion of a user from the auth.users table using admin privileges.

@@ -54,7 +54,7 @@ const LandingPage: React.FC = () => {
         </header>
         
         {/* Part 2: Centered content that fills the remaining space */}
-        <div className="flex flex-col items-center justify-center flex-grow">
+        <div className="flex flex-col items-center justify-center flex-grow pb-24">
             <div className="my-4">
               <AnimatedLogo />
             </div>
