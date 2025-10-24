@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
 import { Team, Clue, LeaderboardEntry, ProblemStatement, ProblemStatementPurchase } from '../types';
@@ -30,6 +29,7 @@ const MarketplaceIcon: React.FC<{className?:string}> = ({className}) => <svg cla
 
 
 type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard' | 'add-ps' | 'view-ps';
+type EventStatus = 'stopped' | 'running' | 'ended' | 'market';
 
 const AdminContentSkeleton: React.FC = () => (
     <div className="w-full">
@@ -165,7 +165,7 @@ const AdminDashboardPage: React.FC = () => {
 
 const EventControl: React.FC = () => {
     const toast = useToast();
-    const [status, setStatus] = useState<'stopped' | 'running' | 'market'>('stopped');
+    const [status, setStatus] = useState<EventStatus>('stopped');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -179,19 +179,18 @@ const EventControl: React.FC = () => {
         fetchStatus();
     }, [toast]);
 
-    const handleEventAction = async (action: 'start' | 'stop' | 'market') => {
-        const newStatus = action === 'start' ? 'running' : action === 'market' ? 'market' : 'stopped';
+    const handleSetStatus = async (newStatus: EventStatus) => {
         const updates: { status: string; start_time?: string } = { status: newStatus };
-        if (action === 'start') {
+        if (newStatus === 'running' && status === 'stopped') {
             updates.start_time = new Date().toISOString();
         }
 
         const { error } = await supabase.from('event').update(updates).eq('id', 1);
 
         if (error) {
-            toast.error(`Failed to ${action} event: ${error.message}`);
+            toast.error(`Failed to update event status: ${error.message}`);
         } else {
-            toast.success(`Event status successfully updated to ${newStatus.toUpperCase()}!`);
+            toast.success(`Event status updated to ${newStatus.toUpperCase()}!`);
             setStatus(newStatus);
         }
     };
@@ -200,6 +199,7 @@ const EventControl: React.FC = () => {
         switch(status) {
             case 'running': return { text: 'RUNNING (CLUE HUNT)', color: 'text-green-400' };
             case 'market': return { text: 'MARKETPLACE OPEN', color: 'text-yellow-400' };
+            case 'ended': return { text: 'CLUE HUNT ENDED', color: 'text-blue-400' };
             default: return { text: 'STOPPED', color: 'text-red-400' };
         }
     };
@@ -216,15 +216,21 @@ const EventControl: React.FC = () => {
                     </span>
                 </p>
                 <div className="flex flex-wrap gap-4">
-                    <GlowingButton onClick={() => handleEventAction('start')} disabled={status === 'running' || status === 'market'} className="!border-green-500 group-hover:!bg-green-500">
-                        Start Event
-                    </GlowingButton>
-                    <GlowingButton onClick={() => handleEventAction('market')} disabled={status !== 'running'} className="!border-yellow-500 group-hover:!bg-yellow-500">
-                        Open Marketplace
-                    </GlowingButton>
-                    <GlowingButton onClick={() => handleEventAction('stop')} disabled={status === 'stopped'} className="!border-red-500 group-hover:!bg-red-500">
-                        Stop Event
-                    </GlowingButton>
+                    {status === 'stopped' && (
+                        <GlowingButton onClick={() => handleSetStatus('running')} className="!border-green-500 group-hover:!bg-green-500">Start Event</GlowingButton>
+                    )}
+                    {status === 'running' && (
+                        <GlowingButton onClick={() => handleSetStatus('ended')} className="!border-red-500 group-hover:!bg-red-500">End Clue Hunt</GlowingButton>
+                    )}
+                    {status === 'ended' && (
+                        <>
+                            <GlowingButton onClick={() => handleSetStatus('market')} className="!border-yellow-500 group-hover:!bg-yellow-500">Open Marketplace</GlowingButton>
+                            <GlowingButton onClick={() => handleSetStatus('stopped')} className="!border-gray-500 group-hover:!bg-gray-500">Reset Event</GlowingButton>
+                        </>
+                    )}
+                    {status === 'market' && (
+                        <GlowingButton onClick={() => handleSetStatus('stopped')} className="!border-red-500 group-hover:!bg-red-500">End Event</GlowingButton>
+                    )}
                 </div>
             </div>
         </div>
@@ -863,13 +869,142 @@ const ViewProblemStatementsManagement: React.FC<{ problemStatements: ProblemStat
 
 
 const LeaderboardView: React.FC = () => {
+    const [domainLeaderboards, setDomainLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
+    const [loading, setLoading] = useState(true);
+    const toast = useToast();
+
+    const fetchLeaderboards = useCallback(async () => {
+        setLoading(true);
+        // Fetch all necessary data in parallel
+        const [teamsRes, progressRes, purchasesRes] = await Promise.all([
+            supabase.from('teams').select('*'),
+            supabase.from('team_progress').select('*'),
+            supabase.from('problem_statement_purchases').select('team_id, problem_statements(cost)')
+        ]);
+
+        if (teamsRes.error) {
+            toast.error(`Failed to load teams: ${teamsRes.error.message}`);
+            setLoading(false);
+            return;
+        }
+        if (progressRes.error) {
+            toast.error(`Failed to load team progress: ${progressRes.error.message}`);
+            setLoading(false);
+            return;
+        }
+        if (purchasesRes.error) {
+            toast.error(`Failed to load purchases: ${purchasesRes.error.message}`);
+            setLoading(false);
+            return;
+        }
+        
+        const teams = teamsRes.data;
+        const progress = progressRes.data;
+        const purchases = purchasesRes.data as unknown as { team_id: number; problem_statements: { cost: number } }[];
+
+        // Create a map for quick lookup of purchase costs
+        const purchaseCostMap = new Map<number, number>();
+        purchases.forEach(p => {
+            if (p.problem_statements) {
+                purchaseCostMap.set(p.team_id, p.problem_statements.cost);
+            }
+        });
+
+        const leaderboards: Record<string, LeaderboardEntry[]> = {};
+
+        for (const domain of DOMAINS) {
+            const domainTeams = teams.filter(team => team.domain === domain);
+            
+            const boardData = domainTeams.map(team => {
+                const solved = progress.filter(p => p.team_id === team.id);
+                const lastSolve = solved.length > 0 
+                    ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) 
+                    : null;
+                
+                // --- NEW: Score Calculation ---
+                // Score = Current coins (wallet) + cost of purchased item (if any)
+                const finalScore = team.coins + (purchaseCostMap.get(team.id) || 0);
+
+                return {
+                    id: team.id,
+                    team: team.name,
+                    coins: finalScore, // Use the calculated score for ranking
+                    cluesSolved: solved.length,
+                    lastSolveTime: lastSolve ? lastSolve.solved_at : null
+                };
+            });
+
+            boardData.sort((a, b) => {
+                if (b.coins !== a.coins) return b.coins - a.coins; // Sort by final score
+                if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
+                if (a.lastSolveTime && b.lastSolveTime) {
+                    const timeA = new Date(a.lastSolveTime).getTime();
+                    const timeB = new Date(b.lastSolveTime).getTime();
+                    if (timeA !== timeB) return timeA - timeB;
+                }
+                return a.id - b.id;
+            });
+            
+            leaderboards[domain] = boardData.map((item, index) => ({ ...item, rank: index + 1 }));
+        }
+        
+        setDomainLeaderboards(leaderboards);
+        setLoading(false);
+    }, [toast]);
+
+    useEffect(() => {
+        fetchLeaderboards();
+
+        const channel = supabase
+            .channel('admin:leaderboard_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboards)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboards)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, fetchLeaderboards)
+            .subscribe((status) => {
+                if (status !== 'SUBSCRIBED') {
+                    // console.log('Could not subscribe to leaderboard changes');
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchLeaderboards]);
+    
     return (
         <div>
-            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Leaderboard</h2>
-            <p className="text-gray-400">This tab provides a quick link to the public-facing leaderboard. All real-time tracking can be viewed there.</p>
-            <GlowingButton to="/leaderboard" className="mt-4 !py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]">
-                View Public Leaderboard
-            </GlowingButton>
+            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Domain Leaderboards</h2>
+            {loading ? (
+                <SkeletonLoader className="h-64 w-full" />
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto pr-2">
+                    {DOMAINS.map(domain => (
+                        <div key={domain} className="bg-white/5 p-4 rounded-lg">
+                            <h3 className="text-2xl font-orbitron text-center text-glow mb-4">{domain}</h3>
+                            <div className="space-y-2">
+                                {domainLeaderboards[domain] && domainLeaderboards[domain].length > 0 ? (
+                                    domainLeaderboards[domain].map(entry => (
+                                        <div key={entry.id} className="flex justify-between items-center p-2 bg-black/20 rounded-md">
+                                            <div className="flex items-center gap-3">
+                                                <span className={`font-bold w-6 text-center ${entry.rank === 1 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                                                    {entry.rank}
+                                                </span>
+                                                <span className="font-semibold">{entry.team}</span>
+                                            </div>
+                                            <div className="font-mono text-right">
+                                                <p>{entry.coins} 🪙</p>
+                                                <p className="text-xs text-gray-400">{entry.cluesSolved} clues</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-center text-gray-500 italic">No activity yet.</p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

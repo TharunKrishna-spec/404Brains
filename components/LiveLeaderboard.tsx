@@ -47,34 +47,46 @@ const LiveLeaderboard: React.FC = () => {
     const [subscriptionStatus, setSubscriptionStatus] = useState<'connecting' | 'subscribed' | 'error'>('connecting');
 
     const fetchLeaderboard = useCallback(async (isInitialLoad = false) => {
-        if (isInitialLoad) {
-            setLoading(true);
-        }
-        
-        const { data: teams, error: teamsError } = await supabase.from('teams').select('*');
-        if (teamsError) {
-            console.error(teamsError);
+        if (isInitialLoad) setLoading(true);
+
+        // Fetch all necessary data in parallel
+        const [teamsRes, progressRes, purchasesRes] = await Promise.all([
+            supabase.from('teams').select('*'),
+            supabase.from('team_progress').select('*'),
+            supabase.from('problem_statement_purchases').select('team_id, problem_statements(cost)')
+        ]);
+
+        if (teamsRes.error || progressRes.error || purchasesRes.error) {
+            console.error("Failed to fetch leaderboard data:", teamsRes.error || progressRes.error || purchasesRes.error);
             if (isInitialLoad) setLoading(false);
             return;
         }
 
-        const { data: progress, error: progressError } = await supabase.from('team_progress').select('*');
-        if (progressError) {
-            console.error(progressError);
-            if (isInitialLoad) setLoading(false);
-            return;
-        }
+        const teams = teamsRes.data;
+        const progress = progressRes.data;
+        const purchases = purchasesRes.data as unknown as { team_id: number; problem_statements: { cost: number } }[];
+
+        // Create a map for quick lookup of purchase costs
+        const purchaseCostMap = new Map<number, number>();
+        purchases.forEach(p => {
+            if (p.problem_statements) {
+                purchaseCostMap.set(p.team_id, p.problem_statements.cost);
+            }
+        });
 
         const boardData = teams.map(team => {
             const solved = progress.filter(p => p.team_id === team.id);
-            const lastSolve = solved.length > 0 
-                ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) 
+            const lastSolve = solved.length > 0
+                ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest)
                 : null;
             
+            // --- NEW: Score Calculation ---
+            const finalScore = team.coins + (purchaseCostMap.get(team.id) || 0);
+
             return {
                 id: team.id,
                 team: team.name,
-                coins: team.coins,
+                coins: finalScore, // Use final score for ranking
                 cluesSolved: solved.length,
                 lastSolveTime: lastSolve ? lastSolve.solved_at : null
             };
@@ -93,9 +105,7 @@ const LiveLeaderboard: React.FC = () => {
         
         setLeaderboard(boardData.map((item, index) => ({ ...item, rank: index + 1 })));
 
-        if (isInitialLoad) {
-            setLoading(false);
-        }
+        if (isInitialLoad) setLoading(false);
     }, []);
 
     const handleRefresh = async () => {
@@ -112,6 +122,7 @@ const LiveLeaderboard: React.FC = () => {
             .channel('public:live_leaderboard')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, () => fetchLeaderboard(false))
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchLeaderboard(false))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, () => fetchLeaderboard(false))
             .subscribe((status, err) => {
                  if (status === 'SUBSCRIBED') {
                     setSubscriptionStatus('subscribed');
@@ -174,7 +185,7 @@ const LiveLeaderboard: React.FC = () => {
                                     <span className="font-bold">{entry.team}</span>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-bold text-lg">{entry.coins} <span className="font-normal text-sm text-yellow-400">🪙</span></p>
+                                    <p className="font-bold text-lg">{entry.coins} <span className="font-normal text-sm text-yellow-400">Pts</span></p>
                                 </div>
                             </motion.div>
                         ))}

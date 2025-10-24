@@ -90,7 +90,7 @@ const TeamDashboardPage: React.FC = () => {
     const [clues, setClues] = useState<Clue[]>([]);
     const [progress, setProgress] = useState<TeamProgress[]>([]);
     const [loading, setLoading] = useState(true);
-    const [eventStatus, setEventStatus] = useState<'stopped' | 'running' | 'market'>('stopped');
+    const [eventStatus, setEventStatus] = useState<'stopped' | 'running' | 'ended' | 'market'>('stopped');
     const [startTime, setStartTime] = useState<string | null>(null);
     const [activeClueElapsedTime, setActiveClueElapsedTime] = useState(0);
     const [currentAnswer, setCurrentAnswer] = useState<{ [clueId: number]: string }>({});
@@ -366,6 +366,14 @@ const TeamDashboardPage: React.FC = () => {
                         <h2 className="text-4xl font-orbitron text-yellow-300">Awaiting Transmission...</h2>
                         <p className="mt-4 text-xl text-yellow-200 max-w-2xl">The event has not yet started. Please stand by.</p>
                         <div className="mt-6 text-6xl animate-pulse">⏳</div>
+                    </div>
+                );
+            case 'ended':
+                return (
+                    <div className="flex flex-col items-center justify-center text-center p-8 bg-black/40 border-2 border-dashed border-blue-500/80 rounded-lg min-h-[40vh] mt-8">
+                        <h2 className="text-4xl font-orbitron text-blue-300">Clue Hunt Concluded</h2>
+                        <p className="mt-4 text-xl text-blue-200 max-w-2xl">The clue-solving phase has ended. Stand by for the marketplace to open.</p>
+                        <div className="mt-6 text-6xl animate-pulse">📡</div>
                     </div>
                 );
             

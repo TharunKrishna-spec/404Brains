@@ -9,7 +9,7 @@ import { useToast } from '../components/Toast';
 const LeaderboardPage: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [eventStatus, setEventStatus] = useState<'stopped' | 'running' | null>(null);
+    const [eventStatus, setEventStatus] = useState<'stopped' | 'running' | 'ended' | 'market' | null>(null);
     const toast = useToast();
 
     const fetchLeaderboardAndStatus = async () => {
@@ -21,22 +21,40 @@ const LeaderboardPage: React.FC = () => {
             setEventStatus(eventData.status);
         }
 
-        // Using an RPC function would be more efficient, but this works client-side.
-        const { data: teams, error: teamsError } = await supabase.from('teams').select('*');
-        if (teamsError) {
-            console.error(teamsError);
-            toast.error(`Failed to load teams: ${teamsError.message}`);
-            setLoading(false);
-            return;
-        }
+        // Fetch all necessary data in parallel
+        const [teamsRes, progressRes, purchasesRes] = await Promise.all([
+            supabase.from('teams').select('*'),
+            supabase.from('team_progress').select('*'),
+            supabase.from('problem_statement_purchases').select('team_id, problem_statements(cost)')
+        ]);
 
-        const { data: progress, error: progressError } = await supabase.from('team_progress').select('*');
-        if (progressError) {
-            console.error(progressError);
-            toast.error(`Failed to load team progress: ${progressError.message}`);
+        if (teamsRes.error) {
+            toast.error(`Failed to load teams: ${teamsRes.error.message}`);
             setLoading(false);
             return;
         }
+        if (progressRes.error) {
+            toast.error(`Failed to load team progress: ${progressRes.error.message}`);
+            setLoading(false);
+            return;
+        }
+        if (purchasesRes.error) {
+            toast.error(`Failed to load purchases: ${purchasesRes.error.message}`);
+            setLoading(false);
+            return;
+        }
+        
+        const teams = teamsRes.data;
+        const progress = progressRes.data;
+        const purchases = purchasesRes.data as unknown as { team_id: number; problem_statements: { cost: number } }[];
+
+        // Create a map for quick lookup of purchase costs
+        const purchaseCostMap = new Map<number, number>();
+        purchases.forEach(p => {
+            if (p.problem_statements) {
+                purchaseCostMap.set(p.team_id, p.problem_statements.cost);
+            }
+        });
 
         const boardData = teams.map(team => {
             const solved = progress.filter(p => p.team_id === team.id);
@@ -44,28 +62,27 @@ const LeaderboardPage: React.FC = () => {
                 ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) 
                 : null;
             
+            // --- NEW: Score Calculation ---
+            const finalScore = team.coins + (purchaseCostMap.get(team.id) || 0);
+
             return {
                 id: team.id,
                 team: team.name,
-                coins: team.coins,
+                coins: finalScore, // Use final score for ranking
                 cluesSolved: solved.length,
                 lastSolveTime: lastSolve ? lastSolve.solved_at : null
             };
         });
 
-        // Sort by coins (desc), then clues solved (desc), then time (asc), then ID (asc)
+        // Sort by score (desc), then clues solved (desc), then time (asc), then ID (asc)
         boardData.sort((a, b) => {
-            // 1. Descending by coins
             if (b.coins !== a.coins) return b.coins - a.coins;
-            // 2. Descending by clues solved
             if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
-            // 3. Ascending by last solve time (earlier is better)
             if (a.lastSolveTime && b.lastSolveTime) {
                 const timeA = new Date(a.lastSolveTime).getTime();
                 const timeB = new Date(b.lastSolveTime).getTime();
                 if (timeA !== timeB) return timeA - timeB;
             }
-            // 4. Tie-breaker: Ascending by Team ID for consistency
             return a.id - b.id;
         });
         
@@ -81,7 +98,7 @@ const LeaderboardPage: React.FC = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboardAndStatus)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboardAndStatus)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchLeaderboardAndStatus)
-            // FIX: The subscribe method requires a callback to handle subscription status.
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, fetchLeaderboardAndStatus)
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     // console.log('Subscribed to leaderboard updates.');
@@ -191,7 +208,7 @@ const LeaderboardPage: React.FC = () => {
                     <div className="grid grid-cols-12 gap-4 p-4 border-b-2 border-[#ff7b00]/30 text-sm uppercase text-gray-300 tracking-wider font-bold">
                         <div className="col-span-2 pl-4">Rank</div>
                         <div className="col-span-4">Team</div>
-                        <div className="col-span-3 text-center">Coins</div>
+                        <div className="col-span-3 text-center">Score</div>
                         <div className="col-span-3 text-center">Clues Solved</div>
                     </div>
 
