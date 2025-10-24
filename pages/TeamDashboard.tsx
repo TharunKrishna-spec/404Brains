@@ -389,7 +389,7 @@ const TeamDashboardPage: React.FC = () => {
                     {totalClues > 0 && (
                         <div className="mb-8 px-2">
                             <h3 className="text-xl font-orbitron text-center text-gray-400 uppercase tracking-widest mb-3">Mission Progress</h3>
-                            <div className="w-full bg-black/50 border-2 border-[#ff7b00]/30 rounded-full p-1 pulse-glow">
+                            <div className="w-full bg-black/50 border-2 border-[#ff7b00]/30 rounded-full p-1 pulse-glow-orange">
                                 <motion.div
                                     className="h-4 bg-gradient-to-r from-[#ff7b00] to-yellow-400 rounded-full shadow-lg shadow-[#ff7b00]/50 progress-bar-shimmer"
                                     initial={{ width: '0%' }}
@@ -433,13 +433,29 @@ const TeamDashboardPage: React.FC = () => {
                                 <div className="lg:col-span-2 space-y-6">
                                     <h2 className="text-3xl font-orbitron text-glow-blue border-b-2 border-[#00eaff]/30 pb-2">Your Clues</h2>
                                      {allCluesSolved ? (
-                                        <div className="flex flex-col items-center justify-center text-center p-8 bg-black/40 border-2 border-dashed border-green-500/80 rounded-lg min-h-[40vh]">
-                                            <div className="text-6xl mb-4">🏆</div>
-                                            <h2 className="text-4xl font-orbitron text-green-300 text-glow-green">TRANSMISSION COMPLETE</h2>
-                                            <p className="mt-4 text-xl text-green-200 max-w-2xl">
-                                                Congratulations, your team has decrypted all clues in your domain! Your final score is locked in. Keep an eye on the live leaderboard for final standings.
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ duration: 0.5, type: 'spring' }}
+                                            className="flex flex-col items-center justify-center text-center p-8 bg-black/40 border-2 border-dashed border-green-500 rounded-lg min-h-[40vh] pulse-glow-green"
+                                        >
+                                            <motion.div
+                                                animate={{ y: [0, -10, 0] }}
+                                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                                className="text-7xl mb-4"
+                                            >
+                                                🏆
+                                            </motion.div>
+                                            <h2 className="text-3xl sm:text-4xl font-orbitron text-green-300">DOMAIN CONQUERED</h2>
+
+                                            <p className="font-orbitron text-5xl sm:text-7xl font-black text-white uppercase tracking-widest text-glow-green my-4">
+                                                {team.domain}
                                             </p>
-                                        </div>
+
+                                            <p className="mt-2 text-lg sm:text-xl text-green-200 max-w-2xl">
+                                                Congratulations! Your team has decrypted all clues. Your final score is locked in. Keep an eye on the live leaderboard for the final standings.
+                                            </p>
+                                        </motion.div>
                                      ) : sortedClues.length > 0 ? (
                                         <div className="space-y-4 max-h-[60vh] overflow-y-auto overflow-x-hidden pr-2">
                                             {sortedClues.map((clue, index) => {
