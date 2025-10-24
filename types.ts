@@ -48,6 +48,8 @@ export interface ProblemStatement {
   description: string;
   cost: number;
   domain: string;
+  // This allows us to join the data easily in the Team Dashboard
+  problem_statement_purchases?: ProblemStatementPurchase[];
 }
 
 export interface ProblemStatementPurchase {
@@ -55,4 +57,6 @@ export interface ProblemStatementPurchase {
   created_at: string;
   team_id: number;
   problem_statement_id: number;
+  // This allows us to join the data easily in the Team Dashboard
+  problem_statements?: ProblemStatement;
 }

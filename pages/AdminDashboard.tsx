@@ -765,8 +765,9 @@ const AddProblemStatementManagement: React.FC<{ onProblemStatementAdded: () => v
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title.trim() || !description.trim() || !cost) {
-            toast.error('All fields are required.');
+        const costValue = parseInt(cost, 10);
+        if (!title.trim() || !description.trim() || isNaN(costValue) || costValue < 0) {
+            toast.error('All fields are required and cost must be a positive number.');
             return;
         }
         setLoading(true);
@@ -774,7 +775,7 @@ const AddProblemStatementManagement: React.FC<{ onProblemStatementAdded: () => v
         const { error } = await supabase.from('problem_statements').insert({
             title: title.trim(),
             description: description.trim(),
-            cost: parseInt(cost, 10),
+            cost: costValue,
             domain: domain,
         });
 
@@ -797,7 +798,7 @@ const AddProblemStatementManagement: React.FC<{ onProblemStatementAdded: () => v
             <form onSubmit={handleSubmit} className="p-4 border border-dashed border-white/20 rounded-lg space-y-3">
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Problem statement title..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Full description..." rows={4} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
-                <input type="number" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Cost in coins..." className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
+                <input type="number" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Cost in coins..." min="0" className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"/>
                 <select value={domain} onChange={(e) => setDomain(e.target.value)} className="w-full px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
                     {DOMAINS.map(d => <option key={d} value={d} className="bg-black text-white">{d}</option>)}
                 </select>
