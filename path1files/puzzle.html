@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Vivaha Bhojanambu Sliding Puzzle</title>
+<style>
+  body { text-align: center; background: #fffaf0; font-family: Arial; }
+  canvas { border: 3px solid #d2691e; margin-top: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+<h2>Vivaha Bhojanambu Sliding Puzzle – Rebuild the Feast </h2>
+<p>Click tiles adjacent to empty space to slide them!</p>
+<canvas id="puzzle" width="450" height="450"></canvas>
+
+<script>
+const img = new Image();
+img.src = "https://imgs.search.brave.com/uDlj_qC9hCNJXKjSyV4URTlXLmeFuFVTkUx74zkmzJE/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE0LzQzLzYyLzE1/LzM2MF9GXzE0NDM2/MjE1NzBfOUJRRldG/MGtGWWw2SXN4VGVU/Z1h2UEJUTTVKbGx1/ZEouanBn"; // Replace with your actual image path
+const canvas = document.getElementById('puzzle');
+const ctx = canvas.getContext('2d');
+
+const rows = 3, cols = 3, size = 150;
+// Empty tile index corresponds to R3C1 = (row 2, col 0) = index 6 (0-based)
+const emptyIndex = 6;
+
+let tiles = [];
+
+img.onload = () => {
+  // Initialize tiles 0..8 except emptyIndex
+  for (let i = 0; i < rows * cols; i++) {
+    if (i !== emptyIndex) tiles.push(i);
+    else tiles.push(null); // Represent empty tile with null
+  }
+  shuffleBoard();
+  draw();
+};
+
+function shuffleBoard() {
+  // Shuffle only the tiles except the empty tile position fixed at emptyIndex
+  let tilePositions = tiles.filter(t => t !== null);
+  for (let i = tilePositions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tilePositions[i], tilePositions[j]] = [tilePositions[j], tilePositions[i]];
+  }
+  // Place shuffled tiles back except emptyIndex reserved
+  let pos = 0;
+  for (let i = 0; i < tiles.length; i++) {
+    if (i !== emptyIndex) {
+      tiles[i] = tilePositions[pos];
+      pos++;
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < tiles.length; i++) {
+    if (tiles[i] === null) {
+      // Empty tile - fill white background
+      let dx = (i % cols) * size;
+      let dy = Math.floor(i / cols) * size;
+      ctx.fillStyle = '#fffaf0';
+      ctx.fillRect(dx, dy, size, size);
+      continue;
+    }
+    let sx = (tiles[i] % cols) * size;
+    let sy = Math.floor(tiles[i] / cols) * size;
+    let dx = (i % cols) * size;
+    let dy = Math.floor(i / cols) * size;
+    ctx.drawImage(img, sx, sy, size, size, dx, dy, size, size);
+  }
+}
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  const clickedIndex = Math.floor(y / size) * cols + Math.floor(x / size);
+  const emptyPos = tiles.indexOf(null);
+
+  // Check if clicked tile is adjacent to empty tile
+  const canMove = (
+    (clickedIndex === emptyPos - 1 && clickedIndex % cols !== cols - 1) || // Left 
+    (clickedIndex === emptyPos + 1 && clickedIndex % cols !== 0) || // Right
+    (clickedIndex === emptyPos - cols) || // Above
+    (clickedIndex === emptyPos + cols) // Below
+  );
+
+  if (canMove) {
+    // Move tile into empty slot
+    tiles[emptyPos] = tiles[clickedIndex];
+    tiles[clickedIndex] = null;
+    draw();
+    // Optional: checkCompletion();
+  }
+});
+
+// Optional: function to check if puzzle is solved
+function checkCompletion() {
+  for (let i = 0; i < tiles.length; i++) {
+    if (tiles[i] !== null && tiles[i] !== i) return false;
+  }
+  alert("Puzzle completed! 🎉");
+  return true;
+}
+</script>
+</body>
+</html>
