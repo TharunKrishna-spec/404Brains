@@ -55,76 +55,131 @@ const AdminDashboardPage: React.FC = () => {
     const [teams, setTeams] = useState<Team[]>([]);
     const [problemStatements, setProblemStatements] = useState<ProblemStatement[]>([]);
     const [purchaseLogs, setPurchaseLogs] = useState<PurchaseLogEntry[]>([]);
+    const [domainLeaderboards, setDomainLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
     const [isLoading, setIsLoading] = useState(true);
     const toast = useToast();
 
-    const fetchClues = async () => {
+    const fetchClues = useCallback(async () => {
         const { data, error } = await supabase.from('clues').select('*').order('id', { ascending: true });
-        if (error) {
-            toast.error(`Failed to fetch clues: ${error.message}`);
-        } else if (data) {
-            setClues(data);
-        }
-    };
+        if (error) toast.error(`Failed to fetch clues: ${error.message}`);
+        else if (data) setClues(data);
+    }, [toast]);
 
-    const fetchTeams = async () => {
+    const fetchTeams = useCallback(async () => {
         const { data, error } = await supabase.from('teams').select('*');
-        if (error) {
-            toast.error(`Failed to fetch teams: ${error.message}`);
-        } else if (data) {
-            setTeams(data);
-        }
-    };
+        if (error) toast.error(`Failed to fetch teams: ${error.message}`);
+        else if (data) setTeams(data);
+    }, [toast]);
 
-    const fetchProblemStatements = async () => {
+    const fetchProblemStatements = useCallback(async () => {
         const { data, error } = await supabase.from('problem_statements').select('*');
-        if (error) {
-            toast.error(`Failed to fetch problem statements: ${error.message}`);
-        } else if (data) {
-            setProblemStatements(data);
-        }
-    };
+        if (error) toast.error(`Failed to fetch problem statements: ${error.message}`);
+        else if (data) setProblemStatements(data);
+    }, [toast]);
     
-    const fetchPurchaseLogs = async () => {
+    const fetchPurchaseLogs = useCallback(async () => {
         const { data, error } = await supabase
             .from('problem_statement_purchases')
             .select('created_at, teams(name), problem_statements(title)')
-            .order('created_at', { ascending: false }); // Show most recent first
+            .order('created_at', { ascending: false });
 
-        if (error) {
-            toast.error(`Failed to fetch purchase logs: ${error.message}`);
-        } else if (data) {
-            setPurchaseLogs(data as PurchaseLogEntry[]);
+        if (error) toast.error(`Failed to fetch purchase logs: ${error.message}`);
+        else if (data) setPurchaseLogs(data as PurchaseLogEntry[]);
+    }, [toast]);
+
+    // FIX: Lifted leaderboard fetching logic to the parent to ensure data synchronization.
+    const fetchLeaderboards = useCallback(async () => {
+        const [teamsRes, progressRes, purchasesRes] = await Promise.all([
+            supabase.from('teams').select('*'),
+            supabase.from('team_progress').select('*'),
+            supabase.from('problem_statement_purchases').select('team_id, problem_statements(cost)')
+        ]);
+
+        if (teamsRes.error) { toast.error(`Leaderboard Error (Teams): ${teamsRes.error.message}`); return; }
+        if (progressRes.error) { toast.error(`Leaderboard Error (Progress): ${progressRes.error.message}`); return; }
+        if (purchasesRes.error) { toast.error(`Leaderboard Error (Purchases): ${purchasesRes.error.message}`); return; }
+        
+        const teams = teamsRes.data;
+        const progress = progressRes.data;
+        const purchases = purchasesRes.data as unknown as { team_id: number; problem_statements: { cost: number } }[];
+
+        const purchaseCostMap = new Map<number, number>();
+        purchases.forEach(p => {
+            if (p.problem_statements) purchaseCostMap.set(p.team_id, p.problem_statements.cost);
+        });
+
+        const leaderboards: Record<string, LeaderboardEntry[]> = {};
+
+        for (const domain of DOMAINS) {
+            const domainTeams = teams.filter(team => team.domain === domain);
+            const boardData = domainTeams.map(team => {
+                const solved = progress.filter(p => p.team_id === team.id);
+                const lastSolve = solved.length > 0 ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) : null;
+                const finalScore = team.coins + (purchaseCostMap.get(team.id) || 0);
+                return { id: team.id, team: team.name, coins: finalScore, cluesSolved: solved.length, lastSolveTime: lastSolve ? lastSolve.solved_at : null };
+            });
+            boardData.sort((a, b) => {
+                if (b.coins !== a.coins) return b.coins - a.coins;
+                if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
+                if (a.lastSolveTime && b.lastSolveTime) {
+                    const timeA = new Date(a.lastSolveTime).getTime();
+                    const timeB = new Date(b.lastSolveTime).getTime();
+                    if (timeA !== timeB) return timeA - timeB;
+                }
+                return a.id - b.id;
+            });
+            leaderboards[domain] = boardData.map((item, index) => ({ ...item, rank: index + 1 }));
         }
-    };
+        setDomainLeaderboards(leaderboards);
+    }, [toast]);
+    
+    // FIX: Combined refresh function to update all relevant data at once.
+    const refreshAllData = useCallback(async () => {
+        await Promise.all([fetchTeams(), fetchLeaderboards()]);
+    }, [fetchTeams, fetchLeaderboards]);
 
     const handleLogout = async () => {
         const { error } = await logout();
-        if (error) {
-            toast.error(`Logout failed: ${error.message}`);
-        }
+        if (error) toast.error(`Logout failed: ${error.message}`);
     };
 
     useEffect(() => {
         const loadInitialData = async () => {
             setIsLoading(true);
-            await Promise.all([fetchClues(), fetchTeams(), fetchProblemStatements(), fetchPurchaseLogs()]);
+            await Promise.all([fetchClues(), fetchTeams(), fetchProblemStatements(), fetchPurchaseLogs(), fetchLeaderboards()]);
             setIsLoading(false);
         };
         loadInitialData();
-    }, []);
+    }, [fetchClues, fetchTeams, fetchProblemStatements, fetchPurchaseLogs, fetchLeaderboards]);
+    
+    // Centralized real-time subscription
+    useEffect(() => {
+        const channel = supabase
+            .channel('admin-dashboard-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => refreshAllData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, () => fetchLeaderboards())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, () => {
+                fetchPurchaseLogs();
+                fetchLeaderboards();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [refreshAllData, fetchLeaderboards, fetchPurchaseLogs]);
 
     const renderContent = () => {
         switch(activeTab) {
             case 'control': return <EventControl />;
-            case 'add-teams': return <AddTeamsManagement onTeamAdded={fetchTeams} />;
-            case 'view-teams': return <ViewTeamsManagement teams={teams} onTeamsChanged={fetchTeams} />;
+            case 'add-teams': return <AddTeamsManagement onTeamAdded={refreshAllData} />;
+            case 'view-teams': return <ViewTeamsManagement teams={teams} onDataChanged={refreshAllData} />;
             case 'add-clues': return <AddCluesManagement onClueAdded={fetchClues} />;
             case 'view-clues': return <ViewCluesManagement clues={clues} onCluesChanged={fetchClues} />;
             case 'add-ps': return <AddProblemStatementManagement onProblemStatementAdded={fetchProblemStatements} />;
             case 'view-ps': return <ViewProblemStatementsManagement problemStatements={problemStatements} onProblemStatementsChanged={fetchProblemStatements} />;
             case 'purchase-logs': return <PurchaseLogsView logs={purchaseLogs} onRefresh={fetchPurchaseLogs} />;
-            case 'leaderboard': return <LeaderboardView />;
+            case 'leaderboard': return <LeaderboardView domainLeaderboards={domainLeaderboards} />;
             default: return null;
         }
     };
@@ -413,7 +468,7 @@ const AddTeamsManagement: React.FC<{ onTeamAdded: () => void }> = ({ onTeamAdded
     );
 };
 
-const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promise<void> }> = ({ teams, onTeamsChanged }) => {
+const ViewTeamsManagement: React.FC<{ teams: Team[], onDataChanged: () => Promise<void> }> = ({ teams, onDataChanged }) => {
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
@@ -432,7 +487,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
         if (isRefreshing) return;
         setIsRefreshing(true);
         try {
-            await onTeamsChanged();
+            await onDataChanged();
             toast.info("Team list has been refreshed.");
         } catch (e) {
             toast.error("Failed to refresh team list.");
@@ -487,10 +542,11 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
             }
 
             toast.success(`Team "${teamToDelete.name}" and all associated data have been completely deleted.`);
-            onTeamsChanged();
+            onDataChanged();
             closeDeleteConfirm();
 
         } catch (e: any) {
+            // FIX: Improved error messaging for function invocation failures.
             const isPermissionError = e.message?.includes('permission denied') || e.code === '42501';
             let errorMessage = isPermissionError
                 ? `Permission Denied. Check RLS policies on all related tables.`
@@ -498,10 +554,12 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
             
             if (e.message.includes('Function not found')) {
                 errorMessage = 'Deletion function not found. Make sure the "delete-user" Supabase Edge Function is deployed correctly.';
+            } else if (e.message?.toLowerCase().includes('failed to fetch')) {
+                 errorMessage = 'Failed to connect to the Edge Function. Please check network and function deployment status.';
             }
 
             toast.error(errorMessage);
-            console.error(e);
+            console.error("Detailed deletion error:", e);
         } finally {
             setDeletingTeamId(null);
         }
@@ -538,7 +596,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
             toast.error(errorMessage);
         } else {
             toast.success(`Team "${editingTeam.name.trim()}" updated successfully.`);
-            onTeamsChanged();
+            onDataChanged();
             handleCancelEdit();
         }
         setIsUpdating(false);
@@ -1079,113 +1137,14 @@ const PurchaseLogsView: React.FC<{ logs: PurchaseLogEntry[], onRefresh: () => Pr
     );
 };
 
-const LeaderboardView: React.FC = () => {
-    const [domainLeaderboards, setDomainLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
-    const [loading, setLoading] = useState(true);
-    const toast = useToast();
+// FIX: Converted LeaderboardView to a presentational component that receives data as props.
+const LeaderboardView: React.FC<{ domainLeaderboards: Record<string, LeaderboardEntry[]> }> = ({ domainLeaderboards }) => {
+    const isLoading = Object.keys(domainLeaderboards).length === 0;
 
-    const fetchLeaderboards = useCallback(async () => {
-        setLoading(true);
-        // Fetch all necessary data in parallel
-        const [teamsRes, progressRes, purchasesRes] = await Promise.all([
-            supabase.from('teams').select('*'),
-            supabase.from('team_progress').select('*'),
-            supabase.from('problem_statement_purchases').select('team_id, problem_statements(cost)')
-        ]);
-
-        if (teamsRes.error) {
-            toast.error(`Failed to load teams: ${teamsRes.error.message}`);
-            setLoading(false);
-            return;
-        }
-        if (progressRes.error) {
-            toast.error(`Failed to load team progress: ${progressRes.error.message}`);
-            setLoading(false);
-            return;
-        }
-        if (purchasesRes.error) {
-            toast.error(`Failed to load purchases: ${purchasesRes.error.message}`);
-            setLoading(false);
-            return;
-        }
-        
-        const teams = teamsRes.data;
-        const progress = progressRes.data;
-        const purchases = purchasesRes.data as unknown as { team_id: number; problem_statements: { cost: number } }[];
-
-        // Create a map for quick lookup of purchase costs
-        const purchaseCostMap = new Map<number, number>();
-        purchases.forEach(p => {
-            if (p.problem_statements) {
-                purchaseCostMap.set(p.team_id, p.problem_statements.cost);
-            }
-        });
-
-        const leaderboards: Record<string, LeaderboardEntry[]> = {};
-
-        for (const domain of DOMAINS) {
-            const domainTeams = teams.filter(team => team.domain === domain);
-            
-            const boardData = domainTeams.map(team => {
-                const solved = progress.filter(p => p.team_id === team.id);
-                const lastSolve = solved.length > 0 
-                    ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) 
-                    : null;
-                
-                // --- NEW: Score Calculation ---
-                // Score = Current coins (wallet) + cost of purchased item (if any)
-                const finalScore = team.coins + (purchaseCostMap.get(team.id) || 0);
-
-                return {
-                    id: team.id,
-                    team: team.name,
-                    coins: finalScore, // Use the calculated score for ranking
-                    cluesSolved: solved.length,
-                    lastSolveTime: lastSolve ? lastSolve.solved_at : null
-                };
-            });
-
-            boardData.sort((a, b) => {
-                if (b.coins !== a.coins) return b.coins - a.coins; // Sort by final score
-                if (b.cluesSolved !== a.cluesSolved) return b.cluesSolved - a.cluesSolved;
-                if (a.lastSolveTime && b.lastSolveTime) {
-                    const timeA = new Date(a.lastSolveTime).getTime();
-                    const timeB = new Date(b.lastSolveTime).getTime();
-                    if (timeA !== timeB) return timeA - timeB;
-                }
-                return a.id - b.id;
-            });
-            
-            leaderboards[domain] = boardData.map((item, index) => ({ ...item, rank: index + 1 }));
-        }
-        
-        setDomainLeaderboards(leaderboards);
-        setLoading(false);
-    }, [toast]);
-
-    useEffect(() => {
-        fetchLeaderboards();
-
-        const channel = supabase
-            .channel('admin:leaderboard_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboards)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboards)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, fetchLeaderboards)
-            .subscribe((status) => {
-                if (status !== 'SUBSCRIBED') {
-                    // console.log('Could not subscribe to leaderboard changes');
-                }
-            });
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [fetchLeaderboards]);
-    
     return (
         <div>
             <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Domain Leaderboards</h2>
-            {loading ? (
+            {isLoading ? (
                 <SkeletonLoader className="h-64 w-full" />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto pr-2">

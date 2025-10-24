@@ -1,5 +1,5 @@
-// FIX: The triple-slash directive to fetch Deno types was failing. Replaced the CDN from esm.sh to unpkg.com to resolve the type definition file and fix "Cannot find name 'Deno'" errors.
-/// <reference types="https://unpkg.com/@supabase/functions-js/src/edge-runtime.d.ts" />
+// FIX: The unpkg.com CDN for Deno types was failing to resolve. Switched back to esm.sh to fix "Cannot find name 'Deno'" errors.
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 // This file is deployed as a Supabase Edge Function.
 // It securely handles the deletion of a user from the auth.users table using admin privileges.
