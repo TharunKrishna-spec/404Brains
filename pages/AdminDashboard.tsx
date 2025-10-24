@@ -328,6 +328,12 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const toast = useToast();
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [domainFilter, setDomainFilter] = useState('All');
+
+    const filteredTeams = teams.filter(team => {
+        if (domainFilter === 'All') return true;
+        return team.domain === domainFilter;
+    });
 
     const handleRefresh = async () => {
         if (isRefreshing) return;
@@ -426,36 +432,52 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                 <h2 className="text-3xl font-orbitron text-[#00eaff]">View & Edit Teams</h2>
-                <button
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
-                    aria-label="Refresh teams list"
-                >
-                    <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
+                <div className="flex items-center gap-4">
+                    <select
+                        value={domainFilter}
+                        onChange={(e) => setDomainFilter(e.target.value)}
+                        className="w-full sm:w-auto px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff]"
+                    >
+                        <option value="All" className="bg-black text-white">All Domains</option>
+                        {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
+                    </select>
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                        aria-label="Refresh teams list"
+                    >
+                        <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
             </div>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                {teams.map(team => (
-                    <div key={team.id} className="p-4 bg-white/5 rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                        <div>
-                            <p className="font-bold text-lg">{team.name}</p>
-                            <p className="text-sm text-gray-400 font-mono">Email: {team.email}</p>
-                            <p className="text-sm text-gray-400">Coins: {team.coins} | Domain: <span className="font-semibold text-gray-300">{team.domain}</span></p>
+                {filteredTeams.length > 0 ? (
+                    filteredTeams.map(team => (
+                        <div key={team.id} className="p-4 bg-white/5 rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                            <div>
+                                <p className="font-bold text-lg">{team.name}</p>
+                                <p className="text-sm text-gray-400 font-mono">Email: {team.email}</p>
+                                <p className="text-sm text-gray-400">Coins: {team.coins} | Domain: <span className="font-semibold text-gray-300">{team.domain}</span></p>
+                            </div>
+                            <div className="flex space-x-4 self-end sm:self-auto">
+                                <button onClick={() => handleOpenEditModal(team)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
+                                <button 
+                                    onClick={() => openDeleteConfirm(team)} 
+                                    className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors"
+                                >
+                                    Delete
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex space-x-4 self-end sm:self-auto">
-                            <button onClick={() => handleOpenEditModal(team)} className="text-sm text-yellow-400 hover:text-yellow-300 hover:underline transition-colors">Edit</button>
-                            <button 
-                                onClick={() => openDeleteConfirm(team)} 
-                                className="text-sm text-red-500 hover:text-red-400 hover:underline transition-colors"
-                            >
-                                Delete
-                            </button>
-                        </div>
+                    ))
+                ) : (
+                    <div className="p-4 text-center text-gray-400 italic">
+                        No teams found for the selected domain.
                     </div>
-                ))}
+                )}
             </div>
             <ConfirmationModal
                 isOpen={!!teamToDelete}
