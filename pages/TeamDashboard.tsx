@@ -106,6 +106,7 @@ const TeamDashboardPage: React.FC = () => {
     const [isMarketLoading, setIsMarketLoading] = useState(true);
     const [psToBuy, setPsToBuy] = useState<ProblemStatement | null>(null);
     const [isBuying, setIsBuying] = useState(false);
+    const [purchaseLimit, setPurchaseLimit] = useState(3);
 
 
     const fetchAllData = useCallback(async () => {
@@ -114,8 +115,8 @@ const TeamDashboardPage: React.FC = () => {
             return;
         }
 
-        // Fetch everything in parallel
-        const [teamRes, eventRes] = await Promise.all([
+        // Fetch primary data
+        const [teamRes, eventBaseRes] = await Promise.all([
             supabase.from('teams').select('*').eq('user_id', user.id).single(),
             supabase.from('event').select('status, start_time').eq('id', 1).single()
         ]);
@@ -127,11 +128,25 @@ const TeamDashboardPage: React.FC = () => {
         }
         const currentTeam = teamRes.data;
         setTeam(currentTeam);
-
-        if (eventRes.error) toast.error(`Failed to get event status: ${eventRes.error.message}`);
-        const currentEventStatus = eventRes.data?.status || 'stopped';
+        
+        if (eventBaseRes.error) toast.error(`Failed to get event status: ${eventBaseRes.error.message}`);
+        const currentEventStatus = eventBaseRes.data?.status || 'stopped';
         setEventStatus(currentEventStatus);
-        setStartTime(eventRes.data?.start_time || null);
+        setStartTime(eventBaseRes.data?.start_time || null);
+        
+        // Safely fetch purchase limit with a fallback
+        try {
+            const { data: limitData, error: limitError } = await supabase.from('event').select('ps_purchase_limit').eq('id', 1).single();
+            if (limitError) throw limitError;
+            if (limitData && typeof limitData.ps_purchase_limit === 'number') {
+                setPurchaseLimit(limitData.ps_purchase_limit);
+            } else {
+                setPurchaseLimit(3);
+            }
+        } catch (e: any) {
+            console.warn("Could not fetch 'ps_purchase_limit'. Falling back to default 3.", e.message);
+            setPurchaseLimit(3);
+        }
 
         // Based on event status, fetch relevant data
         if (currentEventStatus === 'running' && currentTeam) {
@@ -349,16 +364,13 @@ const TeamDashboardPage: React.FC = () => {
         setIsBuying(true);
 
         try {
-            // Using an RPC function for this is safer to avoid race conditions.
-            // This function would check slots, check coins, deduct coins, and insert the purchase atomically.
-            // For now, we'll simulate it client-side with checks.
             const { count: purchaseCount, error: countError } = await supabase
                 .from('problem_statement_purchases')
                 .select('*', { count: 'exact', head: true })
                 .eq('problem_statement_id', psToBuy.id);
 
             if (countError) throw countError;
-            if (purchaseCount >= 3) {
+            if (purchaseCount >= purchaseLimit) {
                 toast.error("Purchase failed: No more slots available for this problem statement.");
                 setIsBuying(false);
                 setPsToBuy(null);
@@ -442,7 +454,7 @@ const TeamDashboardPage: React.FC = () => {
                             {problemStatements.map(ps => {
                                 const count = purchaseCounts[ps.id] || 0;
                                 const canAfford = team.coins >= ps.cost;
-                                const slotsAvailable = count < 3;
+                                const slotsAvailable = count < purchaseLimit;
                                 return (
                                     <div key={ps.id} className={`p-4 rounded-lg border-2 flex flex-col justify-between transition-all ${canAfford && slotsAvailable ? 'bg-black/40 border-[#ff7b00]/70' : 'bg-black/30 border-gray-700 opacity-70'}`}>
                                         <div>
@@ -452,7 +464,7 @@ const TeamDashboardPage: React.FC = () => {
                                         <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
                                             <div className="font-orbitron">
                                                 <p className="text-2xl text-yellow-400">{ps.cost} 🪙</p>
-                                                <p className={`text-sm ${slotsAvailable ? 'text-green-400' : 'text-red-500'}`}>{3 - count} slots remaining</p>
+                                                <p className={`text-sm ${slotsAvailable ? 'text-green-400' : 'text-red-500'}`}>{purchaseLimit - count} slots remaining</p>
                                             </div>
                                             <GlowingButton onClick={() => setPsToBuy(ps)} disabled={!canAfford || !slotsAvailable}>
                                                 Buy

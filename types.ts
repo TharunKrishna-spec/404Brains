@@ -1,4 +1,5 @@
 
+
 export interface Team {
   id: number;
   name: string;
@@ -59,4 +60,11 @@ export interface ProblemStatementPurchase {
   problem_statement_id: number;
   // This allows us to join the data easily in the Team Dashboard
   problem_statements?: ProblemStatement;
+}
+
+// --- NEW: Type for Purchase Log view ---
+export interface PurchaseLogEntry {
+  created_at: string;
+  teams: { name: string } | null;
+  problem_statements: { title: string } | null;
 }

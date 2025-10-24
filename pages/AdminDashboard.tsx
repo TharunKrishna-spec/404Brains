@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PageTransition from '../components/PageTransition';
 import GlowingButton from '../components/GlowingButton';
-import { Team, Clue, LeaderboardEntry, ProblemStatement, ProblemStatementPurchase } from '../types';
+import { Team, Clue, LeaderboardEntry, ProblemStatement, ProblemStatementPurchase, PurchaseLogEntry } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../hooks/useAuth';
 import { v4 as uuidv4 } from 'uuid'; // For unique file names
@@ -26,9 +26,10 @@ const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
 const EditIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
 const DeleteIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 const MarketplaceIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
+const ReceiptIcon: React.FC<{className?:string}> = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
 
 
-type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard' | 'add-ps' | 'view-ps';
+type AdminTab = 'control' | 'add-teams' | 'view-teams' | 'add-clues' | 'view-clues' | 'leaderboard' | 'add-ps' | 'view-ps' | 'purchase-logs';
 type EventStatus = 'stopped' | 'running' | 'ended' | 'market';
 
 const AdminContentSkeleton: React.FC = () => (
@@ -53,6 +54,7 @@ const AdminDashboardPage: React.FC = () => {
     const [clues, setClues] = useState<Clue[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [problemStatements, setProblemStatements] = useState<ProblemStatement[]>([]);
+    const [purchaseLogs, setPurchaseLogs] = useState<PurchaseLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const toast = useToast();
 
@@ -83,6 +85,19 @@ const AdminDashboardPage: React.FC = () => {
         }
     };
     
+    const fetchPurchaseLogs = async () => {
+        const { data, error } = await supabase
+            .from('problem_statement_purchases')
+            .select('created_at, teams(name), problem_statements(title)')
+            .order('created_at', { ascending: false }); // Show most recent first
+
+        if (error) {
+            toast.error(`Failed to fetch purchase logs: ${error.message}`);
+        } else if (data) {
+            setPurchaseLogs(data as PurchaseLogEntry[]);
+        }
+    };
+
     const handleLogout = async () => {
         const { error } = await logout();
         if (error) {
@@ -93,7 +108,7 @@ const AdminDashboardPage: React.FC = () => {
     useEffect(() => {
         const loadInitialData = async () => {
             setIsLoading(true);
-            await Promise.all([fetchClues(), fetchTeams(), fetchProblemStatements()]);
+            await Promise.all([fetchClues(), fetchTeams(), fetchProblemStatements(), fetchPurchaseLogs()]);
             setIsLoading(false);
         };
         loadInitialData();
@@ -108,6 +123,7 @@ const AdminDashboardPage: React.FC = () => {
             case 'view-clues': return <ViewCluesManagement clues={clues} onCluesChanged={fetchClues} />;
             case 'add-ps': return <AddProblemStatementManagement onProblemStatementAdded={fetchProblemStatements} />;
             case 'view-ps': return <ViewProblemStatementsManagement problemStatements={problemStatements} onProblemStatementsChanged={fetchProblemStatements} />;
+            case 'purchase-logs': return <PurchaseLogsView logs={purchaseLogs} onRefresh={fetchPurchaseLogs} />;
             case 'leaderboard': return <LeaderboardView />;
             default: return null;
         }
@@ -145,6 +161,7 @@ const AdminDashboardPage: React.FC = () => {
                             <TabButton tab="view-clues" icon={<ViewIcon className="w-6 h-6"/>} label="View Clues" />
                             <TabButton tab="add-ps" icon={<MarketplaceIcon className="w-6 h-6"/>} label="Add Problem Statement" />
                             <TabButton tab="view-ps" icon={<ViewIcon className="w-6 h-6"/>} label="View Problem Statements" />
+                            <TabButton tab="purchase-logs" icon={<ReceiptIcon className="w-6 h-6"/>} label="Purchase Logs" />
                             <TabButton tab="leaderboard" icon={<LeaderboardIcon className="w-6 h-6"/>} label="Leaderboard" />
                         </aside>
                         <main className="flex-1 flex flex-col min-h-[60vh] md:min-h-0 bg-black/30 p-4 sm:p-6 rounded-lg border border-white/20">
@@ -166,17 +183,44 @@ const AdminDashboardPage: React.FC = () => {
 const EventControl: React.FC = () => {
     const toast = useToast();
     const [status, setStatus] = useState<EventStatus>('stopped');
+    const [purchaseLimit, setPurchaseLimit] = useState(3);
+    const [newPurchaseLimit, setNewPurchaseLimit] = useState('3');
     const [loading, setLoading] = useState(true);
+    const [isUpdatingLimit, setIsUpdatingLimit] = useState(false);
+    const [isLimitFeatureAvailable, setIsLimitFeatureAvailable] = useState(true);
 
     useEffect(() => {
-        const fetchStatus = async () => {
+        const fetchStatusAndLimit = async () => {
             setLoading(true);
-            const { data, error } = await supabase.from('event').select('status').eq('id', 1).single();
-            if (data) setStatus(data.status);
-            if (error) toast.error(`Failed to get event status: ${error.message}`);
+            const { data: eventData, error: eventError } = await supabase.from('event').select('status').eq('id', 1).single();
+            if (eventData) {
+                setStatus(eventData.status);
+            }
+            if (eventError) {
+                toast.error(`Failed to get event status: ${eventError.message}`);
+            }
+
+            try {
+                const { data: limitData, error: limitError } = await supabase.from('event').select('ps_purchase_limit').eq('id', 1).single();
+                if (limitError) throw limitError;
+                if (limitData) {
+                    setPurchaseLimit(limitData.ps_purchase_limit || 3);
+                    setNewPurchaseLimit(String(limitData.ps_purchase_limit || 3));
+                }
+            } catch (e: any) {
+                if (e.message.includes('does not exist')) {
+                    console.warn("Feature 'ps_purchase_limit' not available. DB column may be missing.");
+                    setIsLimitFeatureAvailable(false);
+                } else {
+                    toast.error(`Failed to get purchase limit: ${e.message}`);
+                }
+                setPurchaseLimit(3); // Fallback
+                setNewPurchaseLimit('3');
+            }
+            
             setLoading(false);
         };
-        fetchStatus();
+        fetchStatusAndLimit();
     }, [toast]);
 
     const handleSetStatus = async (newStatus: EventStatus) => {
@@ -195,6 +239,23 @@ const EventControl: React.FC = () => {
         }
     };
     
+    const handleUpdateLimit = async () => {
+        const limit = parseInt(newPurchaseLimit, 10);
+        if (isNaN(limit) || limit < 1) {
+            toast.error("Purchase limit must be a number greater than 0.");
+            return;
+        }
+        setIsUpdatingLimit(true);
+        const { error } = await supabase.from('event').update({ ps_purchase_limit: limit }).eq('id', 1);
+        if (error) {
+            toast.error(`Failed to update purchase limit: ${error.message}`);
+        } else {
+            toast.success(`Purchase limit updated to ${limit}!`);
+            setPurchaseLimit(limit);
+        }
+        setIsUpdatingLimit(false);
+    };
+
     const getStatusInfo = () => {
         switch(status) {
             case 'running': return { text: 'RUNNING (CLUE HUNT)', color: 'text-green-400' };
@@ -204,32 +265,64 @@ const EventControl: React.FC = () => {
         }
     };
 
-    if (loading) return <SkeletonLoader className="h-24 w-full" />;
+    if (loading) return <SkeletonLoader className="h-40 w-full" />;
 
     return (
         <div>
             <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">Event Control</h2>
-            <div className="p-4 border border-dashed border-white/20 rounded-lg space-y-4">
-                <p className="text-lg">Current Status: 
-                    <span className={`font-bold ml-2 ${getStatusInfo().color}`}>
-                        {getStatusInfo().text}
-                    </span>
-                </p>
-                <div className="flex flex-wrap gap-4">
-                    {status === 'stopped' && (
-                        <GlowingButton onClick={() => handleSetStatus('running')} className="!border-green-500 group-hover:!bg-green-500">Start Event</GlowingButton>
-                    )}
-                    {status === 'running' && (
-                        <GlowingButton onClick={() => handleSetStatus('ended')} className="!border-red-500 group-hover:!bg-red-500">End Clue Hunt</GlowingButton>
-                    )}
-                    {status === 'ended' && (
+            <div className="p-4 border border-dashed border-white/20 rounded-lg space-y-6">
+                <div>
+                    <p className="text-lg">Current Status: 
+                        <span className={`font-bold ml-2 ${getStatusInfo().color}`}>
+                            {getStatusInfo().text}
+                        </span>
+                    </p>
+                    <div className="flex flex-wrap gap-4 mt-2">
+                        {status === 'stopped' && (
+                            <GlowingButton onClick={() => handleSetStatus('running')} className="!border-green-500 group-hover:!bg-green-500">Start Event</GlowingButton>
+                        )}
+                        {status === 'running' && (
+                            <GlowingButton onClick={() => handleSetStatus('ended')} className="!border-red-500 group-hover:!bg-red-500">End Clue Hunt</GlowingButton>
+                        )}
+                        {status === 'ended' && (
+                            <>
+                                <GlowingButton onClick={() => handleSetStatus('market')} className="!border-yellow-500 group-hover:!bg-yellow-500">Open Marketplace</GlowingButton>
+                                <GlowingButton onClick={() => handleSetStatus('stopped')} className="!border-gray-500 group-hover:!bg-gray-500">Reset Event</GlowingButton>
+                            </>
+                        )}
+                        {status === 'market' && (
+                            <GlowingButton onClick={() => handleSetStatus('stopped')} className="!border-red-500 group-hover:!bg-red-500">End Event</GlowingButton>
+                        )}
+                    </div>
+                </div>
+                 <div className="pt-4 border-t border-white/10">
+                    {isLimitFeatureAvailable ? (
                         <>
-                            <GlowingButton onClick={() => handleSetStatus('market')} className="!border-yellow-500 group-hover:!bg-yellow-500">Open Marketplace</GlowingButton>
-                            <GlowingButton onClick={() => handleSetStatus('stopped')} className="!border-gray-500 group-hover:!bg-gray-500">Reset Event</GlowingButton>
+                            <p className="text-lg mb-2">Problem Statement Purchase Limit:
+                                <span className="font-bold ml-2 text-yellow-300">
+                                    {purchaseLimit}
+                                </span>
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="number"
+                                    value={newPurchaseLimit}
+                                    onChange={(e) => setNewPurchaseLimit(e.target.value)}
+                                    min="1"
+                                    className="w-32 px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff] placeholder-gray-500"
+                                />
+                                <GlowingButton onClick={handleUpdateLimit} className="!py-2 !px-4 !border-[#00eaff] group-hover:!bg-[#00eaff]" loading={isUpdatingLimit}>
+                                    Update Limit
+                                </ GlowingButton>
+                            </div>
                         </>
-                    )}
-                    {status === 'market' && (
-                        <GlowingButton onClick={() => handleSetStatus('stopped')} className="!border-red-500 group-hover:!bg-red-500">End Event</GlowingButton>
+                    ) : (
+                         <div>
+                            <p className="text-lg mb-2">Problem Statement Purchase Limit</p>
+                            <div className="p-3 bg-yellow-900/30 border border-yellow-700 rounded-md text-yellow-300 text-sm">
+                                <p><strong className="font-bold">Feature Unavailable:</strong> The 'ps_purchase_limit' column seems to be missing from your 'event' table in the database. Please add it to enable this feature.</p>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
@@ -361,32 +454,52 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
 
         setDeletingTeamId(teamToDelete.id);
         try {
-            // 1. Delete team progress first
+            // Cascade delete is preferred, but we'll do it manually to be safe.
+            // 1. Delete team progress
             const { error: progressError } = await supabase
                 .from('team_progress')
                 .delete()
                 .eq('team_id', teamToDelete.id);
-
             if (progressError) throw progressError;
 
-            // 2. Delete team profile
+            // 2. Delete problem statement purchases
+            const { error: purchaseError } = await supabase
+                .from('problem_statement_purchases')
+                .delete()
+                .eq('team_id', teamToDelete.id);
+            if (purchaseError) throw purchaseError;
+
+            // 3. Delete team profile from 'teams' table
             const { error: teamError } = await supabase
                 .from('teams')
                 .delete()
                 .eq('id', teamToDelete.id);
-
             if (teamError) throw teamError;
-            
-            // 3. Instruct admin to manually delete the auth user
-            toast.success(`Team "${teamToDelete.name}" profile deleted. IMPORTANT: Now, go to the Supabase 'Authentication' section and manually delete the user with email: ${teamToDelete.email}`);
+
+            // 4. Invoke edge function to delete the user from auth
+            const { error: functionError } = await supabase.functions.invoke('delete-user', {
+                body: { userId: teamToDelete.user_id },
+            });
+
+            // The function might return an error if the user was already deleted, which we can ignore.
+            if (functionError && !functionError.message.includes('User not found')) {
+                throw functionError;
+            }
+
+            toast.success(`Team "${teamToDelete.name}" and all associated data have been completely deleted.`);
             onTeamsChanged();
             closeDeleteConfirm();
 
         } catch (e: any) {
-             const isPermissionError = e.message?.includes('permission denied') || e.code === '42501';
-             const errorMessage = isPermissionError
-                ? `Permission Denied. Check RLS policies and ensure your admin email matches.`
+            const isPermissionError = e.message?.includes('permission denied') || e.code === '42501';
+            let errorMessage = isPermissionError
+                ? `Permission Denied. Check RLS policies on all related tables.`
                 : `An error occurred: ${e.message}`;
+            
+            if (e.message.includes('Function not found')) {
+                errorMessage = 'Deletion function not found. Make sure the "delete-user" Supabase Edge Function is deployed correctly.';
+            }
+
             toast.error(errorMessage);
             console.error(e);
         } finally {
@@ -405,8 +518,8 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
     };
 
     const handleUpdateTeam = async () => {
-        if (!editingTeam || !editingTeam.name.trim()) {
-            toast.error('Team name cannot be empty.');
+        if (!editingTeam || !editingTeam.name.trim() || editingTeam.coins < 0 || isNaN(editingTeam.coins)) {
+            toast.error('Team name cannot be empty and coins must be a non-negative number.');
             return;
         }
         setIsUpdating(true);
@@ -414,6 +527,7 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
         const { error } = await supabase.from('teams').update({
             name: editingTeam.name.trim(),
             domain: editingTeam.domain,
+            coins: editingTeam.coins,
         }).eq('id', editingTeam.id).select();
 
         if (error) {
@@ -488,13 +602,11 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
                     <>
                         <p>Are you sure you want to delete team <strong className="font-bold text-white">{teamToDelete?.name}</strong>?</p>
                         <p className="mt-2 text-sm text-yellow-400">
-                            This will delete the team's profile and all their progress.
-                            <br />
-                            You must then <strong className="font-semibold text-red-400">manually delete their login credentials</strong> for email: <strong className="font-mono text-white">{teamToDelete?.email}</strong> from the Supabase Authentication page. This action cannot be undone.
+                            This will permanently delete the team's profile, login credentials, and all associated progress. This action cannot be undone.
                         </p>
                     </>
                 }
-                confirmText="Delete Team Data"
+                confirmText="Delete Team Permanently"
                 isConfirming={deletingTeamId === teamToDelete?.id}
             />
              <AnimatePresence>
@@ -522,6 +634,19 @@ const ViewTeamsManagement: React.FC<{ teams: Team[], onTeamsChanged: () => Promi
                                 <select value={editingTeam.domain} onChange={(e) => setEditingTeam({ ...editingTeam, domain: e.target.value })} className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md">
                                     {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
                                 </select>
+
+                                <label className="block text-sm font-bold text-gray-400">Coins</label>
+                                <input
+                                    type="number"
+                                    value={editingTeam.coins}
+                                    onChange={(e) => {
+                                        const newCoins = parseInt(e.target.value, 10);
+                                        setEditingTeam({ ...editingTeam, coins: isNaN(newCoins) ? 0 : newCoins });
+                                    }}
+                                    className="w-full px-3 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md"
+                                    placeholder="Coin balance"
+                                    min="0"
+                                />
                             </div>
                             <div className="flex justify-end space-x-4 pt-4">
                                 <button onClick={handleCancelEdit} className="px-6 py-2 bg-gray-600 rounded-md font-bold hover:bg-gray-500 transition-colors">Cancel</button>
@@ -840,55 +965,119 @@ const AddProblemStatementManagement: React.FC<{ onProblemStatementAdded: () => v
 
 const ViewProblemStatementsManagement: React.FC<{ problemStatements: ProblemStatement[], onProblemStatementsChanged: () => void }> = ({ problemStatements, onProblemStatementsChanged }) => {
     const [purchaseCounts, setPurchaseCounts] = useState<Record<number, number>>({});
+    const [purchaseLimit, setPurchaseLimit] = useState(3);
     const toast = useToast();
 
     useEffect(() => {
-        const fetchCounts = async () => {
-            const { data, error } = await supabase.from('problem_statement_purchases').select('problem_statement_id');
-            if (error) {
+        const fetchCountsAndLimit = async () => {
+            const { data: purchasesData, error: purchasesError } = await supabase.from('problem_statement_purchases').select('problem_statement_id');
+
+            if (purchasesError) {
                 toast.error("Could not fetch purchase counts.");
-                return;
+            } else {
+                const counts: Record<number, number> = {};
+                for (const row of purchasesData) {
+                    counts[row.problem_statement_id] = (counts[row.problem_statement_id] || 0) + 1;
+                }
+                setPurchaseCounts(counts);
             }
-            const counts: Record<number, number> = {};
-            for (const row of data) {
-                counts[row.problem_statement_id] = (counts[row.problem_statement_id] || 0) + 1;
+
+            try {
+                const { data: eventData, error: eventError } = await supabase.from('event').select('ps_purchase_limit').eq('id', 1).single();
+                if (eventError) throw eventError;
+                if (eventData) {
+                    setPurchaseLimit(eventData.ps_purchase_limit || 3);
+                }
+            } catch (e: any) {
+                console.warn("Could not fetch 'ps_purchase_limit'. Falling back to default 3.", e.message);
+                setPurchaseLimit(3);
             }
-            setPurchaseCounts(counts);
         };
-        fetchCounts();
+        fetchCountsAndLimit();
     }, [problemStatements, toast]);
 
-    // This component would also need edit/delete modals, similar to ViewCluesManagement.
-    // For brevity in this response, I'll omit the modals but the structure would be identical.
     const handleDelete = async (psId: number) => {
-        // Implement deletion logic with confirmation modal
         toast.info(`Delete functionality for PS #${psId} would be implemented here.`);
-        // ... supabase.from('problem_statements').delete().eq('id', psId) ...
-        // Remember to also delete from `problem_statement_purchases` or use cascade.
     };
 
     return (
         <div>
             <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">View Problem Statements</h2>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                {problemStatements.map(ps => (
-                    <div key={ps.id} className="p-4 bg-white/5 rounded-lg">
-                        <p className="font-bold text-lg">{ps.title}</p>
-                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{ps.description}</p>
-                        <div className="mt-2 flex justify-between items-center text-sm">
-                            <span className="font-mono text-yellow-400">Cost: {ps.cost} 🪙</span>
-                            <span className="font-mono text-gray-400">Domain: {ps.domain}</span>
-                            <span className={`font-mono ${purchaseCounts[ps.id] >= 3 ? 'text-red-500' : 'text-green-400'}`}>
-                                Purchased: {purchaseCounts[ps.id] || 0} / 3
-                            </span>
+                {problemStatements.map(ps => {
+                    const count = purchaseCounts[ps.id] || 0;
+                    return (
+                        <div key={ps.id} className="p-4 bg-white/5 rounded-lg">
+                            <p className="font-bold text-lg">{ps.title}</p>
+                            <p className="text-sm text-gray-300 whitespace-pre-wrap">{ps.description}</p>
+                            <div className="mt-2 flex justify-between items-center text-sm">
+                                <span className="font-mono text-yellow-400">Cost: {ps.cost} 🪙</span>
+                                <span className="font-mono text-gray-400">Domain: {ps.domain}</span>
+                                <span className={`font-mono ${count >= purchaseLimit ? 'text-red-500' : 'text-green-400'}`}>
+                                    Purchased: {count} / {purchaseLimit}
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );
 };
 
+const PurchaseLogsView: React.FC<{ logs: PurchaseLogEntry[], onRefresh: () => Promise<void> }> = ({ logs, onRefresh }) => {
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const toast = useToast();
+
+    const handleRefresh = async () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+            toast.info("Purchase log has been refreshed.");
+        } catch (e) {
+            toast.error("Failed to refresh purchase log.");
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h2 className="text-3xl font-orbitron text-[#00eaff]">Marketplace Purchase Log</h2>
+                <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                    aria-label="Refresh purchase log"
+                >
+                    <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                {logs.length > 0 ? (
+                    logs.map((log, index) => (
+                        <div key={index} className="p-4 bg-white/5 rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                            <div>
+                                <p className="font-bold text-lg">{log.teams?.name || <span className="text-gray-500 italic">Deleted Team</span>}</p>
+                                <p className="text-sm text-gray-300">purchased</p>
+                                <p className="text-md text-yellow-300 font-semibold">{log.problem_statements?.title || <span className="text-gray-500 italic">Deleted Statement</span>}</p>
+                            </div>
+                            <div className="text-sm text-gray-400 self-end sm:self-auto font-mono">
+                                {new Date(log.created_at).toLocaleString()}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="p-4 text-center text-gray-400 italic">
+                        No problem statements have been purchased yet.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const LeaderboardView: React.FC = () => {
     const [domainLeaderboards, setDomainLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
