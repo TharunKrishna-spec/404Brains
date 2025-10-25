@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PageTransition from '../components/PageTransition';
 import { LeaderboardEntry } from '../types';
 import { supabase } from '../lib/supabaseClient';
@@ -6,13 +6,39 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { useToast } from '../components/Toast';
 
+const ReloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 10M20 20l-1.5-1.5A9 9 0 013.5 14" />
+    </svg>
+);
+
+const LiveIndicator: React.FC<{ status: 'connecting' | 'subscribed' | 'error' }> = ({ status }) => {
+    const statusConfig = {
+        connecting: { pingColor: 'bg-yellow-400', dotColor: 'bg-yellow-500', title: 'Connecting to live updates...' },
+        subscribed: { pingColor: 'bg-green-400', dotColor: 'bg-green-500', title: 'Live updates enabled' },
+        error: { pingColor: 'bg-red-400', dotColor: 'bg-red-500', title: 'Live updates disconnected. Please refresh.' },
+    };
+    const config = statusConfig[status];
+    return (
+        <div className="relative flex h-3 w-3" title={config.title}>
+            {status !== 'error' && ( <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.pingColor} opacity-75`}></span> )}
+            <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotColor}`}></span>
+        </div>
+    );
+};
+
 const LeaderboardPage: React.FC = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [eventStatus, setEventStatus] = useState<'stopped' | 'running' | 'ended' | 'market' | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [subscriptionStatus, setSubscriptionStatus] = useState<'connecting' | 'subscribed' | 'error'>('connecting');
     const toast = useToast();
 
-    const fetchLeaderboardAndStatus = async () => {
+    const fetchLeaderboardAndStatus = useCallback(async (isInitialLoad = false) => {
+        if (isInitialLoad) setLoading(true);
+        else setIsRefreshing(true);
+
         // Fetch event status first
         const { data: eventData, error: eventError } = await supabase.from('event').select('status').eq('id', 1).single();
         if (eventError) {
@@ -30,17 +56,20 @@ const LeaderboardPage: React.FC = () => {
 
         if (teamsRes.error) {
             toast.error(`Failed to load teams: ${teamsRes.error.message}`);
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
+            setIsRefreshing(false);
             return;
         }
         if (progressRes.error) {
             toast.error(`Failed to load team progress: ${progressRes.error.message}`);
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
+            setIsRefreshing(false);
             return;
         }
         if (purchasesRes.error) {
             toast.error(`Failed to load purchases: ${purchasesRes.error.message}`);
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
+            setIsRefreshing(false);
             return;
         }
         
@@ -62,7 +91,6 @@ const LeaderboardPage: React.FC = () => {
                 ? solved.reduce((latest, p) => new Date(p.solved_at) > new Date(latest.solved_at) ? p : latest) 
                 : null;
             
-            // --- NEW: Score Calculation ---
             const finalScore = team.coins + (purchaseCostMap.get(team.id) || 0);
 
             return {
@@ -87,28 +115,34 @@ const LeaderboardPage: React.FC = () => {
         });
         
         setLeaderboard(boardData.map((item, index) => ({ ...item, rank: index + 1 })));
-        setLoading(false);
-    };
+        if (isInitialLoad) setLoading(false);
+        setIsRefreshing(false);
+    }, [toast]);
 
     useEffect(() => {
-        fetchLeaderboardAndStatus();
+        fetchLeaderboardAndStatus(true);
 
         const channel = supabase
             .channel('public:leaderboard_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, fetchLeaderboardAndStatus)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchLeaderboardAndStatus)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, fetchLeaderboardAndStatus)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, fetchLeaderboardAndStatus)
-            .subscribe((status) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_progress' }, () => fetchLeaderboardAndStatus(false))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchLeaderboardAndStatus(false))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'event' }, () => fetchLeaderboardAndStatus(false))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'problem_statement_purchases' }, () => fetchLeaderboardAndStatus(false))
+            .subscribe((status, err) => {
                 if (status === 'SUBSCRIBED') {
-                    // console.log('Subscribed to leaderboard updates.');
+                    setSubscriptionStatus('subscribed');
+                } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                    console.error('Subscription error:', err);
+                    setSubscriptionStatus('error');
+                } else if (status === 'CLOSED') {
+                    setSubscriptionStatus('error');
                 }
             });
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [fetchLeaderboardAndStatus]);
 
     const getRankEmoji = (rank: number) => {
         if (rank === 1) return '🏆';
@@ -256,7 +290,21 @@ const LeaderboardPage: React.FC = () => {
     return (
         <PageTransition>
             <div className="w-full max-w-4xl mx-auto backdrop-blur-sm bg-black/30 p-4 sm:p-8 rounded-2xl border-2 border-[#ff7b00]/50">
-                <h1 className="text-4xl md:text-5xl font-orbitron font-bold mb-8 text-glow text-center">Leaderboard</h1>
+                <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-glow">Leaderboard</h1>
+                        <LiveIndicator status={subscriptionStatus} />
+                    </div>
+                     <button
+                        onClick={() => fetchLeaderboardAndStatus(false)}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-wait flex items-center gap-2"
+                        aria-label="Refresh leaderboard"
+                    >
+                        <ReloadIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span className="text-sm">Refresh</span>
+                    </button>
+                </div>
                 {renderContent()}
             </div>
         </PageTransition>

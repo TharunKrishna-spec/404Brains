@@ -94,14 +94,16 @@ const LandingPage: React.FC = () => {
           </a>
         </div>
 
-        {/* Part 3: Admin Login Link in the corner */}
-        <Link 
-          to="/admin-login" 
-          className="absolute bottom-6 right-6 text-sm text-gray-400 hover:text-[#00eaff] transition-colors font-orbitron tracking-wider glitch-effect"
-          data-text="Admin Access"
-        >
-          Admin Access
-        </Link>
+        {/* Admin Access Link - Bottom Right */}
+        <div className="absolute bottom-6 right-6">
+            <Link 
+              to="/admin-login" 
+              className="text-lg text-gray-400 hover:text-[#00eaff] transition-colors font-orbitron tracking-wider glitch-effect"
+              data-text="Admin Access"
+            >
+              Admin Access
+            </Link>
+        </div>
 
       </div>
 

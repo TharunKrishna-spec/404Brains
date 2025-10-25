@@ -787,6 +787,12 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
     const toast = useToast();
     const [modalState, setModalState] = useState<{ type: 'none' | 'edit' | 'delete', data: Clue | null }>({ type: 'none', data: null });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [domainFilter, setDomainFilter] = useState('All');
+
+    const filteredClues = useMemo(() => {
+        if (domainFilter === 'All') return clues;
+        return clues.filter(clue => clue.domain === domainFilter);
+    }, [clues, domainFilter]);
 
     const handleOpenEditModal = (clue: Clue) => {
         setModalState({ type: 'edit', data: { ...clue } });
@@ -871,9 +877,19 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
 
     return (
         <div>
-            <h2 className="text-3xl font-orbitron mb-6 text-[#00eaff]">View & Edit Clues</h2>
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h2 className="text-3xl font-orbitron text-[#00eaff]">View & Edit Clues</h2>
+                <select
+                    value={domainFilter}
+                    onChange={(e) => setDomainFilter(e.target.value)}
+                    className="w-full sm:w-auto px-4 py-2 bg-transparent border-2 border-[#00eaff]/50 rounded-md focus:outline-none focus:border-[#00eaff]"
+                >
+                    <option value="All" className="bg-black text-white">All Domains</option>
+                    {DOMAINS.map(domain => <option key={domain} value={domain} className="bg-black text-white">{domain}</option>)}
+                </select>
+            </div>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                {clues.length > 0 ? clues.map(clue => (
+                {filteredClues.length > 0 ? filteredClues.map(clue => (
                     <div key={clue.id} className="p-4 bg-white/5 rounded-lg flex justify-between items-start gap-4">
                         <div className="flex-1 min-w-0">
                             <p className="font-bold text-lg whitespace-pre-wrap break-words">{clue.text}</p>
@@ -903,7 +919,7 @@ const ViewCluesManagement: React.FC<{ clues: Clue[], onCluesChanged: () => void 
                         </div>
                     </div>
                 )) : (
-                    <p className="text-gray-400 italic">No clues found. Use the "Add Clues" tab to create some.</p>
+                    <p className="text-gray-400 italic">No clues found for the selected domain.</p>
                 )}
             </div>
             <ConfirmationModal
