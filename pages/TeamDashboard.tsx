@@ -557,7 +557,29 @@ const TeamDashboardPage: React.FC = () => {
                     <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
                 </div>
             </div>
-             <ConfirmationModal isOpen={!!clueToSkip} onClose={() => setClueToSkip(null)} onConfirm={handleConfirmSkip} title="Confirm Skip Clue" message={<><p>Are you sure you want to skip this clue?</p><p className="mt-2 text-lg font-bold text-yellow-400">This will deduct <strong className="font-orbitron">20 COINS</strong> from your total. This action cannot be undone.</p></>} confirmText="Yes, Skip It" isConfirming={isSkipping} borderColorClassName="border-yellow-500" shadowClassName="shadow-yellow-500/20" titleColorClassName="text-yellow-400" confirmButtonClassName="!py-2 !px-6 !border-yellow-500 group-hover:!bg-yellow-500"/>
+             <ConfirmationModal
+                isOpen={!!clueToSkip}
+                onClose={() => setClueToSkip(null)}
+                onConfirm={handleConfirmSkip}
+                title="Confirm Skip Clue"
+                message={
+                    <>
+                        <p>Are you sure you want to skip the following clue?</p>
+                        <blockquote className="my-3 p-3 border-l-4 border-yellow-500 bg-black/30 text-gray-300 italic">
+                            "{clueToSkip?.text}"
+                        </blockquote>
+                        <p className="mt-2 text-lg font-bold text-yellow-400">
+                            This will deduct <strong className="font-orbitron">20 COINS</strong> and cannot be undone.
+                        </p>
+                    </>
+                }
+                confirmText="Yes, Skip It"
+                isConfirming={isSkipping}
+                borderColorClassName="border-yellow-500"
+                shadowClassName="shadow-yellow-500/20"
+                titleColorClassName="text-yellow-400"
+                confirmButtonClassName="!py-2 !px-6 !border-yellow-500 group-hover:!bg-yellow-500"
+            />
              <ConfirmationModal
                 isOpen={!!psToBuy}
                 onClose={() => setPsToBuy(null)}

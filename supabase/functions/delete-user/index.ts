@@ -1,5 +1,9 @@
-// FIX: The path to the Deno type definition file in the CDN URL was incorrect, pointing to /src/ instead of /dist/. This has been corrected to resolve the "Cannot find name 'Deno'" errors.
-/// <reference types="https://esm.sh/@supabase/functions-js@2/dist/edge-runtime.d.ts" />
+// FIX: Removed the triple-slash directive as it can cause errors in non-Deno-configured IDEs.
+// The standard Request/Response types should suffice for this function.
+
+// FIX: Declare 'Deno' as a global constant to resolve TypeScript errors in non-Deno environments.
+// This informs the TypeScript compiler that the 'Deno' object will be available at runtime.
+declare const Deno: any;
 
 // This file is deployed as a Supabase Edge Function.
 // It securely handles the deletion of a user from the auth.users table using admin privileges.
@@ -20,7 +24,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests.
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -56,7 +60,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error in delete-user function:', err.message);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

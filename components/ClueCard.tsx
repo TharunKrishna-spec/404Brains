@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlowingButton from './GlowingButton';
@@ -56,7 +57,11 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
     }, [clue.video_url]);
 
     return (
-        <div className={`p-4 rounded-lg border-2 transition-all duration-500 ${cardStateStyles}`}>
+        <motion.div 
+            layout
+            transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+            className={`p-4 rounded-lg border-2 transition-all duration-500 ${cardStateStyles}`}
+        >
             <div className="flex justify-between items-start">
                 <p className="font-semibold text-xl">Clue #{clueNumber}</p>
                 {isSolved ? (
@@ -115,7 +120,10 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
             
             {isCurrentlyActive && (
                 <>
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                    <form 
+                        className="mt-4 flex flex-col sm:flex-row gap-2"
+                        onSubmit={(e) => { e.preventDefault(); onSubmitAnswer(clue.id); }}
+                    >
                         <input 
                             type="text" 
                             placeholder="Enter your answer..."
@@ -129,13 +137,13 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
                             disabled={status === 'loading' || status === 'correct' || isSkipping}
                         />
                         <GlowingButton 
-                            onClick={() => onSubmitAnswer(clue.id)} 
+                            type="submit"
                             loading={status === 'loading'}
-                            disabled={status === 'correct' || !currentAnswer || isSkipping}
+                            disabled={status === 'correct' || !currentAnswer?.trim() || isSkipping}
                         >
                             Submit
                         </GlowingButton>
-                    </div>
+                    </form>
                     <div className="mt-3 text-center">
                         <button 
                             onClick={() => onSkipClue(clue.id)}
@@ -162,13 +170,13 @@ const ClueCard: React.FC<ClueCardProps> = ({ clue, clueNumber, isSolved, status,
                     </motion.p>
                 )}
                 {status === 'correct' && (
-                    <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="mt-4 text-center font-orbitron text-2xl text-green-400 text-glow-green flex items-center justify-center gap-2">
+                    <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="mt-4 text-center font-orbitron text-2xl text-green-400 text-glow-green flex items-center justify-center gap-2" role="alert">
                         <CheckIcon className="w-8 h-8"/>
                         <span>CORRECT! +{awardedCoins || 10} COINS</span>
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     );
 };
 
