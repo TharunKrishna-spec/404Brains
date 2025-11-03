@@ -1,9 +1,14 @@
-
 # 404: Clue Not Found
 
 **A futuristic dark-themed Solveathon website for Voice-It, VIT Chennai, featuring admin and team portals for a clue-based competition.**
 
 "404: Clue Not Found" is an immersive, real-time competitive platform designed for a multi-team clue-solving event. It features a distinct futuristic aesthetic, role-based portals for teams and administrators, and a dynamic gameplay loop that extends from clue-hunting to a strategic marketplace finale.
+
+---
+
+## ✨ Live Demo
+
+Experience the live application here: **[https://404-brains-gray.vercel.app/](https://404-brains-gray.vercel.app/)**
 
 ---
 
@@ -34,7 +39,7 @@
 
 ---
 
-##  portals
+## 🖥️ Portals
 
 ### 🧑‍💻 Team Portal
 The Team Dashboard is the central hub for participants, offering a real-time, immersive experience.
@@ -94,6 +99,26 @@ The platform is built with a focus on creating an immersive, futuristic, and hig
 
 ---
 
+## 🚀 Running Locally
+
+This project is set up to run directly in the browser using modern ES modules and an import map, requiring no local build step.
+
+1.  **Get the Code:**
+    Download or clone the project files to your local machine.
+
+2.  **Set up Supabase:**
+    The project connects to a Supabase backend for authentication, database, and real-time features.
+    - The necessary Supabase URL and Anon Key are already included in the `lib/supabaseClient.ts` file for the demo.
+    - **Important**: To run this with your own backend, you will need to create a new Supabase project and replace the `supabaseUrl` and `supabaseAnonKey` in `lib/supabaseClient.ts` with your own project's credentials. You will also need to replicate the database schema and set up the `delete-user` Edge Function as seen in the project files.
+
+3.  **Serve the Project:**
+    Since the project uses ES modules (`import`), you need to serve the files from a local web server to avoid browser security errors (CORS).
+    - The easiest way is to use a VS Code extension like **Live Server**.
+    - Right-click on the `index.html` file and select "Open with Live Server".
+    - This will open the application in your default browser, ready to run.
+
+---
+
 ## 🛠️ Technology Stack
 
 - **Frontend**: React, TypeScript, Tailwind CSS
@@ -101,3 +126,8 @@ The platform is built with a focus on creating an immersive, futuristic, and hig
 - **Animation**: Framer Motion
 - **Routing**: React Router
 
+---
+
+## 💻 Developer
+
+- **S I THARUN KRISHNA**
